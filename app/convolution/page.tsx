@@ -1,36 +1,18 @@
 "use client";
 
 
-import { Griffy } from "next/font/google";
+
 import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PresetInput, PRESETS } from "@/library/signal";
+import SignalSourcePanel, {SourceMode, ButtonToggle} from "@/components/ControlPanelSource"
 
 const gapBottom = 10
 
-function ButtonToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        height: 30,
-        padding: "0 10px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.35)",
-        background: active ? "rgba(255,255,255,0.12)" : "transparent",
-        color: "white",
-        fontWeight: 800,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
+export const borderColor = "1px solid rgba(255,255,255,0.35)"
 
 export default function ConvolutionPage() {
     type TimeMode = "continuous" | "discrete";
-    type SourceMode = "preset" | "expression" | "draw";
 
     // ===== time mode ===== isDiscrete default at continuous
     const [timeMode, setTimeMode] = useState<TimeMode>("continuous");
@@ -42,6 +24,10 @@ export default function ConvolutionPage() {
     // ===== x source + h source ===== sources is default at preset
     const [xSource, setXSource] = useState<SourceMode>("preset");
     const [hSource, setHSource] = useState<SourceMode>("preset");
+
+    // ===== presets =====
+    const [xInput, setXInput] = useState<PresetInput>("rect");
+    const [hInput, setHInput] = useState<PresetInput>("tri");
 
     return (
     <main
@@ -59,19 +45,19 @@ export default function ConvolutionPage() {
     <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
         {/* Back Link */}
         <div>
-        <Link
-            href="/"
-            style = {{
-                display: "inline-block",
-                border: "1px solid rgba(255,255,255,0.35)",
-                borderRadius: 10,
-                padding: "5px 10px",
-                fontWeight: 650,
-                fontSize: 13,
-            }}
-        >
-            ← Back
-        </Link>
+            <Link
+                href="/"
+                style = {{
+                    display: "inline-block",
+                    border: borderColor,
+                    borderRadius: 10,
+                    padding: "5px 10px",
+                    fontWeight: 650,
+                    fontSize: 13,
+                }}
+            >
+                ← Back
+            </Link>
         </div>
         {/* Title */}
         <h1 style={{ fontSize: 22, fontWeight: 750, margin: 0, justifySelf:"center"}}>Convolution Canvas (Interactive)</h1>
@@ -81,7 +67,7 @@ export default function ConvolutionPage() {
     {/* Control Panel */}
     <div
         style={{
-            border: "1px solid rgba(255,255,255,0.35)",
+            border: borderColor,
             borderRadius: 12,
             padding: 10,
             boxSizing: "border-box",
@@ -99,22 +85,30 @@ export default function ConvolutionPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap:12}}>
             {/* X Panel */}
             <div>
-                <div style={{ fontWeight:850, display:"flex", alignItems:"center", gap:8, marginBottom:gapBottom}}>
-                <span>x{varLetter} source:</span>
-                <ButtonToggle label="Preset" active={xSource === "preset"} onClick={() => setXSource("preset")} />
-                <ButtonToggle label="Expression" active={xSource === "expression"} onClick={() => setXSource("expression")} />
-                <ButtonToggle label="Draw" active={xSource === "draw"} onClick={() => setXSource("draw")} />
-                </div>
+                <SignalSourcePanel
+                    signalName="x"
+                    varLetter={varLetter}
+                    source={xSource}    
+                    setSource={setXSource}
+                    selectedPreset={xInput}
+                    setSelectedPreset={setXInput}
+                    presets={PRESETS}
+                    gapBottom={gapBottom}
+                />
             </div>
             {/* End of X Panel */}
             {/* H Panel */}
             <div>
-                <div style={{ fontWeight:850, display:"flex", alignItems:"center", gap:8, marginBottom:gapBottom}}>
-                <span>h{varLetter} source:</span>
-                <ButtonToggle label="Preset" active={hSource === "preset"} onClick={() => setHSource("preset")} />
-                <ButtonToggle label="Expression" active={hSource === "expression"} onClick={() => setHSource("expression")} />
-                <ButtonToggle label="Draw" active={hSource === "draw"} onClick={() => setHSource("draw")} />
-                </div>
+                <SignalSourcePanel
+                    signalName="h"
+                    varLetter={varLetter}
+                    source={hSource}    
+                    setSource={setHSource}
+                    selectedPreset={hInput}
+                    setSelectedPreset={setHInput}
+                    presets={PRESETS}
+                    gapBottom={gapBottom}
+                />
             </div>
             {/* End of H Panel */}
         </div>
