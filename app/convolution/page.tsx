@@ -1,15 +1,19 @@
 "use client";
 
-
-
 import Link from "next/link";
+// useState - returns an array with two elements: the current state value and a function to update that value
+// useMemo - It runs the function only when one of its dependencies changes, otherwise, it reuses the last calculated
+// useRef - It returns a mutable object with a single current property, which you can read from and write to directly
+// useEffect - It runs the provided function after the component has rendered and committed to the screen
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
-import SignalSourcePanel, {SourceMode, ButtonToggle} from "@/components/ControlPanelSource"
+import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection} from "@/components/ControlPanelSource"
 
-const gapBottom = 10
+
+export const gapBottom = 10
 
 export const borderColor = "1px solid rgba(255,255,255,0.35)"
+export const backgroundColor = "1px solid rgba(0,0,0,0.25)"
 
 export default function ConvolutionPage() {
     type TimeMode = "continuous" | "discrete";
@@ -29,6 +33,49 @@ export default function ConvolutionPage() {
     const [xInput, setXInput] = useState<PresetInput>("rect");
     const [hInput, setHInput] = useState<PresetInput>("tri");
 
+    // ===== widths (For preset only) =====
+    const [xWidth, setxWidth] = useState<number>(1);
+    const [hWidth, sethWidth] = useState<number>(1);
+
+    // ===== amplitude (For preset only) =====
+    const [xAmp, setxAmp] = useState<number>(1);
+    const [hAmp, sethAmp] = useState<number>(1);
+
+    // ===== width range ====
+    const WidthMinC = 0.2, WidthMaxC = 3, WidthStepC = 0.01;
+    const WidthMinD = 0, WidthMaxD = 20, WidthStepD = 1;
+
+    // ===== set width range according to mode =====
+    const WidthMin = isDiscrete ? WidthMinD : WidthMinC;
+    const WidthMax = isDiscrete ? WidthMaxD : WidthMaxC;
+    const WidthStep = isDiscrete ? WidthStepD : WidthStepC;
+
+    // ===== Amplitude range ====
+    const AmpMin = -10, AmpMax = 10, AmpStep = 0.01;
+
+    // ===== Text box =====
+    const [xWidthText, setxWidthText] = useState<string>(isDiscrete ? String(Math.round(xWidth)) : xWidth.toFixed(2));
+    const [hWidthText, sethWidthText] = useState<string>(isDiscrete ? String(Math.round(hWidth)) : hWidth.toFixed(2));
+    const [xAmpText, setxAmpText] = useState<string>(xAmp.toFixed(2))
+    const [hAmpText, sethAmpText] = useState<string>(hAmp.toFixed(2))
+
+    // Handle rounding of int when switching between CT and DT 
+    useEffect(() => {
+    if (isDiscrete) {
+        const newXWidth = Math.round(xWidth);
+        const newHWidth = Math.round(hWidth);
+
+        setxWidth(newXWidth);
+        sethWidth(newHWidth);
+
+        setxWidthText(String(newXWidth));
+        sethWidthText(String(newHWidth));
+    } else {
+        setxWidthText(xWidth.toFixed(2));
+        sethWidthText(hWidth.toFixed(2));
+    }}, [isDiscrete]);
+    
+
     return (
     <main
         style={{
@@ -36,7 +83,7 @@ export default function ConvolutionPage() {
         padding: "10px 12px 40px 12px",
         boxSizing: "border-box",
         overflow: "hidden",
-        backgroundColor: "#000000",
+        backgroundColor: backgroundColor,
         color: "#ffffff",
         }}
     >
@@ -85,34 +132,112 @@ export default function ConvolutionPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap:12}}>
             {/* X Panel */}
             <div>
-                <SignalSourcePanel
+                <SignalSourceSelection
                     signalName="x"
                     varLetter={varLetter}
                     source={xSource}    
                     setSource={setXSource}
-                    selectedPreset={xInput}
-                    setSelectedPreset={setXInput}
-                    presets={PRESETS}
                     gapBottom={gapBottom}
                 />
+                {xSource === "preset" && (
+                    <>
+                        {/* x preset drop down selection */}
+                        <SignalSourcePreset
+                            signalName="x"
+                            varLetter={varLetter}
+                            selectedPreset={xInput}
+                            setSelectedPreset={setXInput}
+                            presets={PRESETS}
+                            gapBottom={gapBottom}
+                        />
+                        {/* x width sliders */}
+                        <TextBoxSliders
+                            signalName = "x"
+                            varLetter = {varLetter}
+                            strWidthAmp = "width"
+                            isDiscrete = {isDiscrete}
+                            roundOnDiscrete={true}
+                            minRange = {WidthMin}
+                            maxRange = {WidthMax}
+                            stepRange = {WidthStep}
+                            widthValue = {xWidth}
+                            setWidthValue = {setxWidth}
+                            widthText={xWidthText}
+                            setWidthText={setxWidthText}
+                        />
+                        {/* x amp sliders */}
+                        <TextBoxSliders
+                            signalName = "x"
+                            varLetter = {varLetter}
+                            strWidthAmp = "Amplitude"
+                            isDiscrete = {isDiscrete}
+                            roundOnDiscrete={false}
+                            minRange = {AmpMin}
+                            maxRange = {AmpMax}
+                            stepRange = {AmpStep}
+                            widthValue = {xAmp}
+                            setWidthValue = {setxAmp}
+                            widthText={xAmpText}
+                            setWidthText={setxAmpText}
+                        />
+                    </>
+                )}
             </div>
             {/* End of X Panel */}
             {/* H Panel */}
             <div>
-                <SignalSourcePanel
+                <SignalSourceSelection
                     signalName="h"
                     varLetter={varLetter}
                     source={hSource}    
                     setSource={setHSource}
-                    selectedPreset={hInput}
-                    setSelectedPreset={setHInput}
-                    presets={PRESETS}
                     gapBottom={gapBottom}
                 />
+                {hSource === "preset" && (
+                <>
+                    {/* h preset drop down selection */}
+                    <SignalSourcePreset
+                        signalName="h"
+                        varLetter={varLetter}
+                        selectedPreset={hInput}
+                        setSelectedPreset={setHInput}
+                        presets={PRESETS}
+                        gapBottom={gapBottom}
+                    />
+                    {/* h width sliders */}
+                    <TextBoxSliders
+                        signalName = "h"
+                        varLetter = {varLetter}
+                        strWidthAmp = "width"
+                        isDiscrete = {isDiscrete}
+                        roundOnDiscrete={true}
+                        minRange = {WidthMin}
+                        maxRange = {WidthMax}
+                        stepRange = {WidthStep}
+                        widthValue = {hWidth}
+                        setWidthValue = {sethWidth}
+                        widthText={hWidthText}
+                        setWidthText={sethWidthText}
+                    />
+                    {/* h Amp sliders */}
+                    <TextBoxSliders
+                        signalName = "h"
+                        varLetter = {varLetter}
+                        strWidthAmp = "Amplitude"
+                        isDiscrete = {isDiscrete}
+                        roundOnDiscrete={false}
+                        minRange = {AmpMin}
+                        maxRange = {AmpMax}
+                        stepRange = {AmpStep}
+                        widthValue = {hAmp}
+                        setWidthValue = {sethAmp}
+                        widthText={hAmpText}
+                        setWidthText={sethAmpText}
+                    />
+                </>)}
             </div>
             {/* End of H Panel */}
         </div>
-
     </div>
     {/* End of Control Panel */}
 
