@@ -8,6 +8,7 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
 import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection} from "@/components/ControlPanelSource"
+import SignalPlot from "@/components/SignalPlot";
 
 
 export const gapBottom = 10
@@ -74,7 +75,47 @@ export default function ConvolutionPage() {
         setxWidthText(xWidth.toFixed(2));
         sethWidthText(hWidth.toFixed(2));
     }}, [isDiscrete]);
-    
+
+    // ==== screen height ====
+    // set inital value 
+    const [vh, setVh] = useState<number>(800);
+    // ref measured heights
+    const headerRef = useRef<HTMLDivElement | null>(null);
+    const controlsRef = useRef<HTMLDivElement | null>(null);
+
+    const [headerH, setHeaderH] = useState(0);
+    const [controlsH, setControlsH] = useState(0);
+
+    // wait until browser is ready and get real browser height
+    useEffect(() => {
+        const update = () => setVh(window.innerHeight);
+        update();
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+
+    useEffect(() => {
+        const headerEl = headerRef.current;
+        const controlsEl = controlsRef.current;
+        if (!headerEl || !controlsEl) return;
+
+        const update = () => {
+            setHeaderH(headerEl.getBoundingClientRect().height);
+            setControlsH(controlsEl.getBoundingClientRect().height);
+        };
+
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(headerEl);
+        ro.observe(controlsEl);
+        return () => ro.disconnect();
+    }, []);
+
+    // ==== Signal Plot Height ====
+    const bottomSafeHeight = 46;
+    const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
+    const availableHeight = Math.max(240, remainingHeight); //use highest value
+    const signalPlotHeight = Math.floor((availableHeight - gapBottom) / 2 );
 
     return (
     <main
@@ -89,7 +130,7 @@ export default function ConvolutionPage() {
     >
 
     {/* Header; 3 column; 1fr at back to center title */}
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
+    <div ref={headerRef} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
         {/* Back Link */}
         <div>
             <Link
@@ -113,6 +154,7 @@ export default function ConvolutionPage() {
 
     {/* Control Panel */}
     <div
+        ref={controlsRef}
         style={{
             border: borderColor,
             borderRadius: 12,
@@ -242,17 +284,26 @@ export default function ConvolutionPage() {
     {/* End of Control Panel */}
 
     {/* Signal Plot input X and H overlap */}
-    <div>
+    <div style={{marginBottom: gapBottom}}>
+        <SignalPlot
+            title={"test 1"}
+            height={signalPlotHeight}
+            traces={[1000]}
+        />
 
+        
     </div>
     {/* End of Signal Plot input X and H overlap */}
-
+        
     {/* Signal Plot output convolution */}
     <div>
-
+        <SignalPlot
+            title={"test 2"}
+            height={signalPlotHeight}
+            traces={[1000]}
+        />
     </div>
     {/* End of Signal Plot output convolution */}
-
     </main>
     );
 }

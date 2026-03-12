@@ -125,8 +125,11 @@ export function TextBoxSliders({
                         setWidthValue(vv);
                         setWidthText(isDiscrete && roundOnDiscrete ? String(vv) : vv.toFixed(2));
                     }}
+                    // on Enter, do the same thing as blur
+                    onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                     
-                />                        
+                />
+                <span> range: [ {minRange} , {maxRange} ]</span>                        
             </div>
             {/* Sliders bar*/}
             <input
