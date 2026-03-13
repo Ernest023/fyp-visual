@@ -43,6 +43,16 @@ type TextBoxSlidersProps = {
     setWidthText: React.Dispatch<React.SetStateAction<string>>;
 };
 
+type TSlidersProps = {
+    tminRange: number;
+    tmaxRange: number;
+    tStepSize: number;
+    tvalue: number;
+    setTValue: React.Dispatch<React.SetStateAction<number>>;
+    yValue: number;
+    isDiscrete: boolean;
+};
+
 export function ButtonToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void;}) {
   return (
     <button
@@ -146,6 +156,38 @@ export function TextBoxSliders({
                     // real time update of text box
                     setWidthText(isDiscrete && roundOnDiscrete ? String(v) : v.toFixed(2));
                 }}
+            />
+        </div>
+    );
+}
+
+export function TSliders({
+    tminRange,
+    tmaxRange,
+    tStepSize,
+    tvalue,
+    setTValue,
+    yValue,
+    isDiscrete,
+}: TSlidersProps) {
+    return (
+        <div>
+            <div style={{ fontWeight: 650, fontSize: 11, opacity: 0.95, display: "flex", gap: 8, alignItems: "center" }}>
+                <span>
+                    Slide {isDiscrete ? "n" : "t"}: {isDiscrete ? Math.round(tvalue) : tvalue.toFixed(2)}
+                    {" | "} y = {yValue.toFixed(4)}
+                    {" | "} range: [{tminRange.toFixed(1)}, {tmaxRange.toFixed(1)}]
+                </span>
+            </div>
+
+            <input
+                type="range"
+                style={{ width: "100%", height: 14 }}
+                min={tminRange}
+                max={tmaxRange}
+                step={tStepSize}
+                value={tvalue}
+                onChange={(e) => setTValue(parseFloat(e.target.value))}
             />
         </div>
     );

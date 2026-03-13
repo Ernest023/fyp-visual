@@ -6,6 +6,48 @@ import React from "react";
 //npm install -D @types/react-plotly.js @types/plotly.js
 const Plot: any = dynamic(() => import("react-plotly.js"), { ssr: false });
 
+// StemTraces for discrete
+export function makeStemTraces(x: number[], y: Array<number | null>, name: string, color: string) {
+  const xs: (number | null)[] = [];
+  const ys: (number | null)[] = [];
+
+  const mx: number[] = [];
+  const my: number[] = [];
+
+  for (let i = 0; i < x.length; i++) {
+    const yi = y[i];
+    if (yi === null || Number.isNaN(yi)) continue;
+
+    xs.push(x[i], x[i], null);
+    ys.push(0, yi, null);
+
+    mx.push(x[i]);
+    my.push(yi);
+  }
+
+  const stems = {
+    x: xs,
+    y: ys,
+    type: "scatter",
+    mode: "lines",
+    name: `${name} stems`,
+    showlegend: false,
+    line: { color, width: 2 },
+    hoverinfo: "skip",
+  };
+
+  const markers = {
+    x: mx,
+    y: my,
+    type: "scatter",
+    mode: "markers",
+    name,
+    marker: { color, size: 7 },
+  };
+
+  return [stems, markers];
+}
+
 export default function SignalPlot({
   title,
   subtitle,
@@ -14,6 +56,8 @@ export default function SignalPlot({
   shapes = [],
   xLabel,
   yLabel,
+  xRange,
+  yRange,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -22,6 +66,8 @@ export default function SignalPlot({
   shapes?: any[];
   xLabel?: string;
   yLabel?: string;
+  xRange?: [number, number];
+  yRange?: [number, number];
 }) {
   const pad = 8;
   const titleH = subtitle ? 44 : 26;
@@ -77,6 +123,8 @@ export default function SignalPlot({
           plot_bgcolor: "white",
 
           xaxis: {
+            range: xRange,
+
             zeroline: true,
             zerolinecolor: zeroColor,
             zerolinewidth: 1,
@@ -100,6 +148,8 @@ export default function SignalPlot({
           },
 
           yaxis: {
+            range: yRange,
+
             zeroline: true,
             zerolinecolor: zeroColor,
             zerolinewidth: 1,
@@ -141,3 +191,4 @@ export default function SignalPlot({
     </div>
   );
 }
+

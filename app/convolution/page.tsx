@@ -7,11 +7,11 @@ import Link from "next/link";
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
-import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection} from "@/components/ControlPanelSource"
-import SignalPlot from "@/components/SignalPlot";
+import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
+import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
 
 
-export const gapBottom = 10
+export const gapBottom = 7
 
 export const borderColor = "1px solid rgba(255,255,255,0.35)"
 export const backgroundColor = "1px solid rgba(0,0,0,0.25)"
@@ -116,6 +116,248 @@ export default function ConvolutionPage() {
     const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
     const availableHeight = Math.max(240, remainingHeight); //use highest value
     const signalPlotHeight = Math.floor((availableHeight - gapBottom) / 2 );
+
+    // evaluate the chosen preset signal at that x-value
+    function getPresetValue(
+        presetId: PresetInput,
+        inputX: number,
+        width: number,
+        amplitude: number
+    ): number {
+        const preset = PRESETS.find((p) => p.id === presetId);
+        if (!preset) return 0;
+
+        // width scales horizontally, amplitude scales vertically
+        return amplitude * preset.fn(inputX / width);
+    }
+
+    //tau = internal variable for convolution
+	//tAxis = output x-axis values
+    //dt = spacing between tau samples in CT
+	//tMin, tMax = output/slider range
+	//reference: y(t) = ∫ x(τ) h(t-τ) dτ; y[n] = Σ x[k] h[n-k]
+    const { tau, tAxis, dt, tMin, tMax } = useMemo(() => {
+    if (!isDiscrete) {
+        const base = 2;
+        const scale = Math.max(1, xWidth + hWidth + 0.5);
+        const domain = base * scale;
+        // Creates 1400 evenly spaced points from -domain to +domain
+        const tau = Array.from({ length: 1400 }, (_, i) => -domain + (2 * domain * i) / 1399);
+        const tAxis = Array.from({ length: 700 }, (_, i) => -domain + (2 * domain * i) / 699);
+        // sample step
+        const dt = tau[1] - tau[0];
+
+        return { tau, tAxis, dt, tMin: -domain, tMax: domain };
+    }
+
+        const WxR = Math.round(xWidth);
+        const WhR = Math.round(hWidth);
+        const nMax = Math.max(12, WxR + WhR + 6);
+        // Creates min 40 evenly spaced points
+        const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
+        const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
+    
+        return { tau, tAxis, dt: 1, tMin: -nMax, tMax: nMax };
+    }, [isDiscrete, xWidth, hWidth]);
+
+    // Current t slider position/value
+    const [t0, setT0] = useState<number>(0);
+
+    useEffect(() => {
+    setT0((prev) => Math.max(tMin, Math.min(tMax, prev)));
+    }, [tMin, tMax]);
+
+    // create y-axis point; original unshifted signals; 
+    // CT: x(t0) ; DT: x[n0]
+    // tau = x-positions; xSamples = y-values of x at those positions; hSamples = y-values of h at those positions
+    const xSamples = useMemo(() => {
+    return tau.map((v) => getPresetValue(xInput, v, xWidth, xAmp));
+    }, [tau, xInput, xWidth, xAmp]);
+
+    // CT: h(t0) ; DT: h[n0]
+    const hSamples = useMemo(() => {
+    return tau.map((v) => getPresetValue(hInput, v, hWidth, hAmp));
+    }, [tau, hInput, hWidth, hAmp]);
+
+    // CT: h(t0 - τ) ; DT: h[n0 - k]
+    const hFlippedSamples = useMemo(() => {
+    return tau.map((v) => getPresetValue(hInput, t0 - v, hWidth, hAmp));
+    }, [tau, hInput, hWidth, hAmp, t0]);
+
+    // temporary product curve at the current slider position
+    const productSamples = useMemo(() => {
+    return tau.map((_, i) => xSamples[i] * hFlippedSamples[i]);
+    }, [tau, xSamples, hFlippedSamples]);
+
+    // convolution output
+    const ySamples = useMemo(() => {
+        if (!isDiscrete) {
+            return tAxis.map((t) => {
+            let sum = 0;
+
+            for (let i = 0; i < tau.length; i++) {
+                const tauVal = tau[i];
+                const xVal = getPresetValue(xInput, tauVal, xWidth, xAmp);
+                const hVal = getPresetValue(hInput, t - tauVal, hWidth, hAmp);
+                sum += xVal * hVal;
+            }
+            return sum * dt;
+            });
+        }
+
+        return tAxis.map((n) => {
+            let sum = 0;
+            for (let i = 0; i < tau.length; i++) {
+            const k = tau[i];
+            const xVal = getPresetValue(xInput, k, xWidth, xAmp);
+            const hVal = getPresetValue(hInput, n - k, hWidth, hAmp);
+            sum += xVal * hVal;
+            }
+            return sum;
+        });
+    }, [isDiscrete, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp]);
+
+    // Current output value at slider
+    const yAtT0 = useMemo(() => {
+        let bestIdx = 0;
+        let bestDist = Math.abs(tAxis[0] - t0);
+        for (let i = 1; i < tAxis.length; i++) {
+            const d = Math.abs(tAxis[i] - t0);
+            if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+            }
+        }
+        return ySamples[bestIdx] ?? 0;
+        }, [tAxis, ySamples, t0]);
+
+
+    // plot data
+    const inputTraces = useMemo(() => {
+    if (isDiscrete) {
+        return [
+        ...makeStemTraces(tau, xSamples, "x[k]", "rgba(34,197,94,0.95)"),
+        ...makeStemTraces(tau, hFlippedSamples, "h[n-k]", "rgba(249,115,22,0.95)"),
+        {
+                x: tau,
+                y: productSamples,
+                type: isDiscrete ? "bar" : "scatter",
+                mode: isDiscrete ? "" : "lines",
+                name: isDiscrete ? "x[k]h[n-k]" : "x(τ)h(t-τ)",
+                marker: {color: "rgba(255,0,0,0.25)"},
+                fill : "tozeroy",
+                fillcolor: "rgba(255,0,0,0.25)",
+                hoverinfo: "skip",
+        },
+        
+        ];
+    }
+
+    return [
+        {
+            x: tau,
+            y: xSamples,
+            type: "scatter",
+            mode: "lines",
+            name: "x(τ)",
+            marker: {color: "rgba(34,197,94,0.95)"},
+        },
+        {
+            x: tau,
+            y: hFlippedSamples,
+            type: "scatter",
+            mode: "lines",
+            name: "h(t-τ)",
+            marker: {color: "rgba(249,115,22,0.95)"},
+        },
+        {
+            x: tau,
+            y: productSamples,
+            type: "scatter",
+            mode: "lines",
+            name: "x(τ)h(t-τ)",
+            marker: {color: "rgba(255,0,0,0.25)"},
+            fill : "tozeroy",
+            fillcolor: "rgba(255,0,0,0.25)",
+            hoverinfo: "skip",
+        },
+    ];
+    }, [tau, xSamples, hFlippedSamples, productSamples, isDiscrete]);
+
+    // ===== output plot y-range =====
+    // Lowest visible output value, but include 0 so the axis still shows the baseline
+    const outYMin = useMemo(() => Math.min(...ySamples, 0), [ySamples]);
+    const outYMax = useMemo(() => Math.max(...ySamples, 0), [ySamples]);
+
+
+    // ===== revealed output curve =====
+    // Show only the part of the output waveform up to the current slider position t0.
+    // Values after t0 are set to null so Plotly hides that part of the curve.
+    const yReveal = useMemo(() => {
+        return tAxis.map((x, i) => {
+            if (x <= t0) return ySamples[i];
+            return null;
+        });
+    }, [tAxis, ySamples, t0]);
+
+    const outputTraces = useMemo(() => {
+        if (isDiscrete) {
+            const yRevealDiscrete = tAxis.map((x, i) => (x <= t0 ? ySamples[i] : null));
+            return [
+                ...makeStemTraces(tAxis, yRevealDiscrete, "y[n]", "rgba(37,99,235,0.95)"),
+                {
+                    x: [t0],
+                    y: [yAtT0],
+                    type: "scatter",
+                    mode: "markers",
+                    name: "current y[n]",
+                    marker: { color: "rgba(220,38,38,0.95)", size: 9 },
+                },
+                {
+                    x: [t0, t0],
+                    y: [outYMin, outYMax],
+                    type: "scatter",
+                    mode: "lines",
+                    name: "current n",
+                    line: { color: "rgba(220,38,38,0.85)", width: 2, dash: "dot" },
+                    hoverinfo: "skip",
+                },
+            ];
+        }
+        return [
+            {
+                x: tAxis,
+                y: yReveal,
+                type: "scatter",
+                mode: "lines",
+                name: "y(t)",
+                line: { color: "rgba(37,99,235,0.95)", width: 3 },
+            },
+            {
+                x: [t0],
+                y: [yAtT0],
+                type: "scatter",
+                mode: "markers",
+                name: "current y(t)",
+                marker: { color: "rgba(220,38,38,0.95)", size: 9 },
+            },
+            {
+                x: [t0, t0],
+                y: [outYMin, outYMax],
+                type: "scatter",
+                mode: "lines",
+                name: "current t",
+                line: { color: "rgba(220,38,38,0.85)", width: 2, dash: "dot" },
+                hoverinfo: "skip",
+            },
+        ];
+    }, [isDiscrete, tAxis, ySamples, yReveal, t0, yAtT0, outYMin, outYMax]);
+
+    // ===== fixed x-axis range for plotting =====
+    // Add a little extra padding in DT so the outermost stems are not cut too tightly.
+    const xPad = isDiscrete ? 1 : 0;
+    const xLo = tMin - xPad;
+    const xHi = tMax + xPad;
 
     return (
     <main
@@ -280,15 +522,28 @@ export default function ConvolutionPage() {
             </div>
             {/* End of H Panel */}
         </div>
+
+        <TSliders
+            tminRange={tMin}
+            tmaxRange={tMax}
+            tStepSize={isDiscrete ? 1 : 0.01}
+            tvalue={t0}
+            setTValue={setT0}
+            yValue={yAtT0}
+            isDiscrete={isDiscrete}
+        />
     </div>
     {/* End of Control Panel */}
 
     {/* Signal Plot input X and H overlap */}
     <div style={{marginBottom: gapBottom}}>
         <SignalPlot
-            title={"test 1"}
+            title={isDiscrete ? "Input:x[k] and h[n-k]":"Input: x(τ) and h(t-τ)"}
             height={signalPlotHeight}
-            traces={[1000]}
+            traces={inputTraces}
+            xLabel={isDiscrete ? "k" : "τ"}
+            yLabel={"Amplitude"}
+            xRange={[xLo, xHi]}
         />
 
         
@@ -298,9 +553,12 @@ export default function ConvolutionPage() {
     {/* Signal Plot output convolution */}
     <div>
         <SignalPlot
-            title={"test 2"}
+            title={isDiscrete ? "Output: y[n] = Σ x[k] h[n-k]" : "Output: y(t) = ∫ x(τ) h(t - τ) dτ"}
             height={signalPlotHeight}
-            traces={[1000]}
+            traces={outputTraces}
+            xLabel={isDiscrete ? "n" : "t"}
+            yLabel={"Amplitude"}
+            xRange={[xLo, xHi]}
         />
     </div>
     {/* End of Signal Plot output convolution */}
