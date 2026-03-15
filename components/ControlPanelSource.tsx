@@ -12,12 +12,14 @@ type PresetOption = {
 };
 
 type SignalSourcePresetProps = {
-    signalName: string;
-    varLetter: string;
     selectedPreset: PresetInput;
     setSelectedPreset: React.Dispatch<React.SetStateAction<PresetInput>>;
     presets: PresetOption[];
     gapBottom: number;
+    amplitude: number;
+    width: number;
+    displaySignalLabel: string;
+    inputExpr: string;
 };
 
 type SignalSourceSelectionProps = {
@@ -26,6 +28,9 @@ type SignalSourceSelectionProps = {
     source: SourceMode;
     setSource: React.Dispatch<React.SetStateAction<SourceMode>>;
     gapBottom: number;
+    isHSignal: boolean;
+    isHFlipped: boolean;
+    setIsHFlipped: React.Dispatch<React.SetStateAction<boolean>> | (() => void);
 };
 
 type TextBoxSlidersProps = {
@@ -41,6 +46,7 @@ type TextBoxSlidersProps = {
     setWidthValue: React.Dispatch<React.SetStateAction<number>>;
     widthText: string;
     setWidthText: React.Dispatch<React.SetStateAction<string>>;
+    signalLabel?: string;
 };
 
 type TSlidersProps = {
@@ -62,7 +68,7 @@ export function ButtonToggle({ label, active, onClick }: { label: string; active
             padding: "0 10px",
             borderRadius: 10,
             border: borderColor,
-            background: active ? "rgba(255,255,255,0.12)" : "transparent",
+            background: active ? "rgba(255, 255, 255, 0.25)" : "transparent",
             color: "white",
             fontWeight: 800,
             cursor: "pointer",
@@ -86,12 +92,13 @@ export function TextBoxSliders({
     setWidthValue,
     widthText,
     setWidthText,
+    signalLabel
     }:
     TextBoxSlidersProps){
     return (
         <div>
             <div style={ {fontWeight: 650, fontSize:11, opacity:0.95, display: "flex", gap: 8, alignItems: "center" } }>
-                <span>{signalName}{varLetter} {strWidthAmp}:</span>
+                <span>{signalLabel ?? `${signalName}${varLetter}`} {strWidthAmp}:</span>
                 {/* input text box */}
                 <input 
                     type="text"
@@ -175,7 +182,8 @@ export function TSliders({
             <div style={{ fontWeight: 650, fontSize: 11, opacity: 0.95, display: "flex", gap: 8, alignItems: "center" }}>
                 <span>
                     Slide {isDiscrete ? "n" : "t"}: {isDiscrete ? Math.round(tvalue) : tvalue.toFixed(2)}
-                    {" | "} y = {yValue.toFixed(4)}
+                    {" | "}
+                    {isDiscrete ? `overlap sum = ${yValue.toFixed(1)}` : `Area under the product curve = ${yValue.toFixed(4)}`}
                     {" | "} range: [{tminRange.toFixed(1)}, {tmaxRange.toFixed(1)}]
                 </span>
             </div>
@@ -198,7 +206,10 @@ export function SignalSourceSelection({
     varLetter,
     source,
     setSource,
-    gapBottom
+    gapBottom,
+    isHSignal,
+    isHFlipped,
+    setIsHFlipped,
     }: 
     SignalSourceSelectionProps) {
     return (
@@ -207,40 +218,86 @@ export function SignalSourceSelection({
             <ButtonToggle label="Preset" active={source === "preset"} onClick={() => setSource("preset")}/>
             <ButtonToggle label="Expression" active={source === "expression"} onClick={() => setSource("expression")}/>
             <ButtonToggle label="Draw" active={source === "draw"} onClick={() => setSource("draw")}/>
+            {isHSignal && (
+                <>
+                    <span>Flip h for convolution:</span>
+                    <ButtonToggle label="Flip" active={isHFlipped} onClick={() => setIsHFlipped((prev: boolean) => !prev)}/>
+                </>
+            )}
         </div>
     );  
 }
 
+function formatPresetExpression(
+    preset: PresetInput,
+    amplitude: number,
+    width: number,
+    inputExpr: string
+): string {
+    const ampStr = amplitude === 1 ? "" : amplitude === -1 ? "-" : `${amplitude}`;
+    const scaledExpr = width === 1 ? inputExpr : `(${inputExpr})/${width}`;
+
+    switch (preset) {
+        case "rect":
+            return `${ampStr}rect(${scaledExpr})`;
+
+        case "tri":
+            return `${ampStr}tri(${scaledExpr})`;
+
+        case "step":
+            return `${ampStr}u(${scaledExpr})`;
+
+        case "ramp":
+            return `${ampStr}ramp(${scaledExpr})`;
+
+        case "sgn":
+            return `${ampStr}sgn(${scaledExpr})`;
+
+        case "sine":
+            return `${ampStr}sin(2π·${scaledExpr})`;
+
+        case "exp":
+            return `${ampStr}e^(-2·${scaledExpr})u(${scaledExpr})`;
+
+        case "imp":
+            return `${ampStr}δ(${scaledExpr})`;
+
+        default:
+            return `${ampStr}${preset}(${scaledExpr})`;
+    }
+}
 
 export default function SignalSourcePreset({
-    signalName,
-    varLetter,
     selectedPreset,
     setSelectedPreset,
     presets,
-    gapBottom
+    gapBottom,
+    amplitude,
+    width,
+    displaySignalLabel,
+    inputExpr,
     }: 
     SignalSourcePresetProps) {
-    return (
-        <div>
-            {/* dropdown list input */}
-            <label>{/* input */}
-                <div>
-                    {signalName}
-                    {varLetter} preset
-                </div>
-                {/* dropdown */}
-                <select 
-                value={selectedPreset} 
-                onChange={(e) => setSelectedPreset(e.target.value as PresetInput)} 
-                style={{ width: "100%", height: 34, borderRadius: 10, background: "black", color: "white", border: borderColor, marginBottom: gapBottom}} >
-                {presets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                        {p.id}
-                    </option>
-                ))}
-                </select>
-            </label> 
-        </div>
-    );  
+        const presetText = formatPresetExpression(selectedPreset, amplitude, width, inputExpr);
+        return (
+            <div>
+                {/* dropdown list input */}
+                <label>{/* input */}
+                    <div>
+                        Preset: {displaySignalLabel} = {presetText}
+                    </div>
+                    {/* dropdown */}
+                    <select 
+                    value={selectedPreset} 
+                    onChange={(e) => setSelectedPreset(e.target.value as PresetInput)} 
+                    style={{ width: "100%", height: 34, borderRadius: 10, background: "black", color: "white", border: borderColor, marginBottom: gapBottom}} >
+                    {presets.map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.id}
+                        </option>
+                    ))}
+                    </select>
+                </label> 
+            </div>
+        );  
 }

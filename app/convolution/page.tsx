@@ -131,6 +131,9 @@ export default function ConvolutionPage() {
         return amplitude * preset.fn(inputX / width);
     }
 
+    // samplePointmultiplier
+    const spm = 1
+    const spmfix = spm - 1
     //tau = internal variable for convolution
 	//tAxis = output x-axis values
     //dt = spacing between tau samples in CT
@@ -142,8 +145,8 @@ export default function ConvolutionPage() {
         const scale = Math.max(1, xWidth + hWidth + 0.5);
         const domain = base * scale;
         // Creates 1400 evenly spaced points from -domain to +domain
-        const tau = Array.from({ length: 1400 }, (_, i) => -domain + (2 * domain * i) / 1399);
-        const tAxis = Array.from({ length: 700 }, (_, i) => -domain + (2 * domain * i) / 699);
+        const tau = Array.from({ length: 1400 * spm }, (_, i) => -domain + (2 * domain * i) / (1399 * spm + spmfix));
+        const tAxis = Array.from({ length: 700 * spm }, (_, i) => -domain + (2 * domain * i) / (699 * spm + spmfix));
         // sample step
         const dt = tau[1] - tau[0];
 
@@ -153,7 +156,7 @@ export default function ConvolutionPage() {
         const WxR = Math.round(xWidth);
         const WhR = Math.round(hWidth);
         const nMax = Math.max(12, WxR + WhR + 6);
-        // Creates min 40 evenly spaced points
+        // Creates min 12 * 2  + 1 evenly spaced points
         const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
         const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
     
@@ -174,7 +177,7 @@ export default function ConvolutionPage() {
     return tau.map((v) => getPresetValue(xInput, v, xWidth, xAmp));
     }, [tau, xInput, xWidth, xAmp]);
 
-    // CT: h(t0) ; DT: h[n0]
+    // CT: h(t0) ; DT: h[n0] It does not depend on t0, so moving the slider does nothing to it.
     const hSamples = useMemo(() => {
     return tau.map((v) => getPresetValue(hInput, v, hWidth, hAmp));
     }, [tau, hInput, hWidth, hAmp]);
@@ -184,23 +187,49 @@ export default function ConvolutionPage() {
     return tau.map((v) => getPresetValue(hInput, t0 - v, hWidth, hAmp));
     }, [tau, hInput, hWidth, hAmp, t0]);
 
+    // 
+    const hShiftedNotFlippedSamples = useMemo(() => {
+        return tau.map((v) => getPresetValue(hInput, v - t0, hWidth, hAmp));
+    }, [tau, hInput, hWidth, hAmp, t0]);
+
+    // h signal flipped state
+    const [isHFlipped, setIsHFlipped] = useState(false);
+
+    // h signal flipped and orginal 
+    const hDisplaySamples = useMemo(() => {
+        return isHFlipped ? hFlippedSamples : hShiftedNotFlippedSamples;
+    }, [isHFlipped, hFlippedSamples, hShiftedNotFlippedSamples]);
+
     // temporary product curve at the current slider position
     const productSamples = useMemo(() => {
-    return tau.map((_, i) => xSamples[i] * hFlippedSamples[i]);
-    }, [tau, xSamples, hFlippedSamples]);
+        return tau.map((_, i) => xSamples[i] * hDisplaySamples[i]);
+    }, [tau, xSamples, hDisplaySamples]);
 
     // convolution output
+    // y(t) = ∫ x(τ) h(t - τ) dτ; integral add up infinitely many tiny pieces of area
+    // Each tiny piece of area is approximately: height × width
+    // height = x(τ) h(t - τ), width = dt
+    // one tiny slice contributes: x(τ) h(t - τ) × dt
+    // full integral is approximated by summing all those slices: y(t) ≈ Σ [x(τ_i) h(t - τ_i)] × dt
     const ySamples = useMemo(() => {
         if (!isDiscrete) {
             return tAxis.map((t) => {
             let sum = 0;
-
+            
+            //xVal * hVal = product height at one sampled point
+            //sum = total of all sampled heights
+            //sum * dt = approximate area under the product curve
             for (let i = 0; i < tau.length; i++) {
                 const tauVal = tau[i];
                 const xVal = getPresetValue(xInput, tauVal, xWidth, xAmp);
-                const hVal = getPresetValue(hInput, t - tauVal, hWidth, hAmp);
+
+                const hVal = isHFlipped
+                    ? getPresetValue(hInput, t - tauVal, hWidth, hAmp)   // convolution
+                    : getPresetValue(hInput, tauVal - t, hWidth, hAmp);  // unflipped shifted
+
                 sum += xVal * hVal;
             }
+            // Multiply by dt to convert the sampled sum into an approximation of the continuous integral.
             return sum * dt;
             });
         }
@@ -210,12 +239,15 @@ export default function ConvolutionPage() {
             for (let i = 0; i < tau.length; i++) {
             const k = tau[i];
             const xVal = getPresetValue(xInput, k, xWidth, xAmp);
-            const hVal = getPresetValue(hInput, n - k, hWidth, hAmp);
+
+            const hVal = isHFlipped
+                ? getPresetValue(hInput, n - k, hWidth, hAmp)   // convolution
+                : getPresetValue(hInput, k - n, hWidth, hAmp);  // unflipped shifted
             sum += xVal * hVal;
-            }
+        }
             return sum;
         });
-    }, [isDiscrete, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp]);
+    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp]);
 
     // Current output value at slider
     const yAtT0 = useMemo(() => {
@@ -237,7 +269,7 @@ export default function ConvolutionPage() {
     if (isDiscrete) {
         return [
         ...makeStemTraces(tau, xSamples, "x[k]", "rgba(34,197,94,0.95)"),
-        ...makeStemTraces(tau, hFlippedSamples, "h[n-k]", "rgba(249,115,22,0.95)"),
+        ...makeStemTraces(tau, hDisplaySamples, isHFlipped ? "h[n-k]" : "h[n]", "rgba(249,115,22,0.95)"),
         {
                 x: tau,
                 y: productSamples,
@@ -247,7 +279,7 @@ export default function ConvolutionPage() {
                 marker: {color: "rgba(255,0,0,0.25)"},
                 fill : "tozeroy",
                 fillcolor: "rgba(255,0,0,0.25)",
-                hoverinfo: "skip",
+                //hoverinfo: "skip",
         },
         
         ];
@@ -264,11 +296,11 @@ export default function ConvolutionPage() {
         },
         {
             x: tau,
-            y: hFlippedSamples,
+            y: hDisplaySamples,
             type: "scatter",
             mode: "lines",
-            name: "h(t-τ)",
-            marker: {color: "rgba(249,115,22,0.95)"},
+            name: isHFlipped ? "h(t-τ)" : "h(t)",
+            marker: { color: "rgba(249,115,22,0.95)" },
         },
         {
             x: tau,
@@ -282,7 +314,7 @@ export default function ConvolutionPage() {
             hoverinfo: "skip",
         },
     ];
-    }, [tau, xSamples, hFlippedSamples, productSamples, isDiscrete]);
+    }, [tau, xSamples, hDisplaySamples, productSamples, isDiscrete, isHFlipped]);
 
     // ===== output plot y-range =====
     // Lowest visible output value, but include 0 so the axis still shows the baseline
@@ -302,9 +334,8 @@ export default function ConvolutionPage() {
 
     const outputTraces = useMemo(() => {
         if (isDiscrete) {
-            const yRevealDiscrete = tAxis.map((x, i) => (x <= t0 ? ySamples[i] : null));
             return [
-                ...makeStemTraces(tAxis, yRevealDiscrete, "y[n]", "rgba(37,99,235,0.95)"),
+                ...makeStemTraces(tAxis, yReveal, "y[n]", "rgba(53, 53, 254, 0.95)"),
                 {
                     x: [t0],
                     y: [yAtT0],
@@ -358,6 +389,13 @@ export default function ConvolutionPage() {
     const xPad = isDiscrete ? 1 : 0;
     const xLo = tMin - xPad;
     const xHi = tMax + xPad;
+
+    const hDisplayLabel = isDiscrete ? (isHFlipped ? "h[n-k]" : "h[n]") : (isHFlipped ? "h(t-τ)" : "h(t)");
+    const xDisplayLabel = isDiscrete ? "x[n]" : "x(t)";
+
+    const xInputExpr = isDiscrete ? "n" : "t";
+    const hInputExpr = isDiscrete ? (isHFlipped ? "n-k" : "n") : (isHFlipped ? "t-τ" : "t");
+
 
     return (
     <main
@@ -422,17 +460,23 @@ export default function ConvolutionPage() {
                     source={xSource}    
                     setSource={setXSource}
                     gapBottom={gapBottom}
+                    isHSignal={false}
+                    isHFlipped={false}
+                    // dummy value
+                    setIsHFlipped={() => {}}
                 />
                 {xSource === "preset" && (
                     <>
                         {/* x preset drop down selection */}
                         <SignalSourcePreset
-                            signalName="x"
-                            varLetter={varLetter}
                             selectedPreset={xInput}
                             setSelectedPreset={setXInput}
                             presets={PRESETS}
                             gapBottom={gapBottom}
+                            amplitude={xAmp}
+                            width={xWidth}
+                            displaySignalLabel={xDisplayLabel}
+                            inputExpr={xInputExpr}
                         />
                         {/* x width sliders */}
                         <TextBoxSliders
@@ -476,17 +520,22 @@ export default function ConvolutionPage() {
                     source={hSource}    
                     setSource={setHSource}
                     gapBottom={gapBottom}
+                    isHSignal={true}
+                    isHFlipped={isHFlipped}
+                    setIsHFlipped={setIsHFlipped}
                 />
                 {hSource === "preset" && (
                 <>
                     {/* h preset drop down selection */}
                     <SignalSourcePreset
-                        signalName="h"
-                        varLetter={varLetter}
                         selectedPreset={hInput}
                         setSelectedPreset={setHInput}
                         presets={PRESETS}
                         gapBottom={gapBottom}
+                        amplitude={hAmp}
+                        width={hWidth}
+                        displaySignalLabel={hDisplayLabel}
+                        inputExpr={hInputExpr}
                     />
                     {/* h width sliders */}
                     <TextBoxSliders
@@ -502,6 +551,7 @@ export default function ConvolutionPage() {
                         setWidthValue = {sethWidth}
                         widthText={hWidthText}
                         setWidthText={sethWidthText}
+                        signalLabel={hDisplayLabel}
                     />
                     {/* h Amp sliders */}
                     <TextBoxSliders
@@ -517,6 +567,7 @@ export default function ConvolutionPage() {
                         setWidthValue = {sethAmp}
                         widthText={hAmpText}
                         setWidthText={sethAmpText}
+                        signalLabel={hDisplayLabel}
                     />
                 </>)}
             </div>
@@ -538,7 +589,7 @@ export default function ConvolutionPage() {
     {/* Signal Plot input X and H overlap */}
     <div style={{marginBottom: gapBottom}}>
         <SignalPlot
-            title={isDiscrete ? "Input:x[k] and h[n-k]":"Input: x(τ) and h(t-τ)"}
+            title={ isDiscrete ? `Input: x[k] and ${isHFlipped ? "h[n-k]" : "h[n]"}`: `Input: x(t) and ${isHFlipped ? "h(t-τ)" : "h(t)"}`}
             height={signalPlotHeight}
             traces={inputTraces}
             xLabel={isDiscrete ? "k" : "τ"}
@@ -553,7 +604,8 @@ export default function ConvolutionPage() {
     {/* Signal Plot output convolution */}
     <div>
         <SignalPlot
-            title={isDiscrete ? "Output: y[n] = Σ x[k] h[n-k]" : "Output: y(t) = ∫ x(τ) h(t - τ) dτ"}
+            title={isDiscrete ? 
+                `Output: y[n] = Σ x[k] ${isHFlipped ? "h[n-k]" : "h[k-n]"}` : `Output: y(t) = ∫ x(τ) ${isHFlipped ? "h(t - τ)" : "h(τ - t)"} dτ`}
             height={signalPlotHeight}
             traces={outputTraces}
             xLabel={isDiscrete ? "n" : "t"}
