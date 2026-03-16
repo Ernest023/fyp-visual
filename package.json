@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "expr-eval": "^2.0.2",
     "next": "16.1.6",
     "plotly.js": "^3.4.0",
     "react": "19.2.3",

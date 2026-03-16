@@ -9,7 +9,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
 import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
 import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
-
+import CustomExpressionInput from "@/components/CustomExpressionInput";
+import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
 
 export const gapBottom = 7
 
@@ -59,6 +60,50 @@ export default function ConvolutionPage() {
     const [hWidthText, sethWidthText] = useState<string>(isDiscrete ? String(Math.round(hWidth)) : hWidth.toFixed(2));
     const [xAmpText, setxAmpText] = useState<string>(xAmp.toFixed(2))
     const [hAmpText, sethAmpText] = useState<string>(hAmp.toFixed(2))
+
+    // ==== x and h input expression state ====
+    const [xExpr, setXExpr] = useState("rect(t)");
+    const [hExpr, setHExpr] = useState("tri(t)");
+
+    // ==== error message for expression state ====
+    const [xExprError, setXExprError] = useState("");
+    const [hExprError, setHExprError] = useState("");
+
+    
+    const xExprCheck = useMemo(() => {
+        if (xSource !== "expression") return { ok: true, error: "" };
+        if (xExpr.trim() === "") return { ok: true, error: "" };
+        return validateExpression(xExpr);
+    }, [xExpr, xSource]);
+
+    useEffect(() => {
+        setXExprError(xExprCheck.error);
+    }, [xExprCheck]);
+    // If x is using custom expression mode, validate the typed text, and if valid, build a function for it.
+    const xExprFn = useMemo(() => {
+        if (xSource !== "expression") return null;
+        if (xExpr.trim() === "") return null;
+        if (!xExprCheck.ok) return null;
+        return buildExpressionEvaluator(xExpr);
+    }, [xExpr, xSource, xExprCheck]);
+
+    
+    const hExprCheck = useMemo(() => {
+        if (hSource !== "expression") return { ok: true, error: "" };
+        if (hExpr.trim() === "") return { ok: true, error: "" };
+        return validateExpression(hExpr);
+    }, [hExpr, hSource]);
+
+    useEffect(() => {
+        setHExprError(hExprCheck.error);
+    }, [hExprCheck]);
+    // If h is using custom expression mode, validate the typed text, and if valid, build a function for it.
+    const hExprFn = useMemo(() => {
+        if (hSource !== "expression") return null;
+        if (hExpr.trim() === "") return null;
+        if (!hExprCheck.ok) return null;
+        return buildExpressionEvaluator(hExpr);
+    }, [hExpr, hSource, hExprCheck]);
 
     // Handle rounding of int when switching between CT and DT 
     useEffect(() => {
@@ -134,8 +179,8 @@ export default function ConvolutionPage() {
     // samplePointmultiplier
     const spm = 1
     const spmfix = spm - 1
-    //tau = internal variable for convolution
-	//tAxis = output x-axis values
+    //tau = array that consist x-axis position of 1400 points; top plot; 1400 to have a better intergral approx
+	//tAxis = array that consist x-axis position of 700 points; bottom plot
     //dt = spacing between tau samples in CT
 	//tMin, tMax = output/slider range
 	//reference: y(t) = ∫ x(τ) h(t-τ) dτ; y[n] = Σ x[k] h[n-k]
@@ -155,7 +200,7 @@ export default function ConvolutionPage() {
 
         const WxR = Math.round(xWidth);
         const WhR = Math.round(hWidth);
-        const nMax = Math.max(12, WxR + WhR + 6);
+        const nMax = Math.max(40, WxR + WhR + 6);
         // Creates min 12 * 2  + 1 evenly spaced points
         const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
         const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
@@ -170,27 +215,50 @@ export default function ConvolutionPage() {
     setT0((prev) => Math.max(tMin, Math.min(tMax, prev)));
     }, [tMin, tMax]);
 
+    function evaluateXSignal(inputX: number): number {
+        if (xSource === "preset") {
+            return getPresetValue(xInput, inputX, xWidth, xAmp);
+        }
+
+        if (xSource === "expression" && xExprFn) {
+            if (xExpr.trim() === "" || !xExprFn) return 0;
+            return xAmp * xExprFn(inputX / xWidth);
+        }
+        return 0;
+    }
+
+    function evaluateHSignal(inputX: number): number {
+        if (hSource === "preset") {
+            return getPresetValue(hInput, inputX, hWidth, hAmp);
+        }
+        if (hSource === "expression" && hExprFn) {
+            if (hExpr.trim() === "" || !hExprFn) return 0;
+            return hAmp * hExprFn(inputX / hWidth);
+        }
+    return 0;
+    }
+
     // create y-axis point; original unshifted signals; 
     // CT: x(t0) ; DT: x[n0]
     // tau = x-positions; xSamples = y-values of x at those positions; hSamples = y-values of h at those positions
     const xSamples = useMemo(() => {
-    return tau.map((v) => getPresetValue(xInput, v, xWidth, xAmp));
-    }, [tau, xInput, xWidth, xAmp]);
+        return tau.map((v) => evaluateXSignal(v));
+    }, [tau, xSource, xInput, xWidth, xAmp, xExprFn]);
 
     // CT: h(t0) ; DT: h[n0] It does not depend on t0, so moving the slider does nothing to it.
     const hSamples = useMemo(() => {
-    return tau.map((v) => getPresetValue(hInput, v, hWidth, hAmp));
-    }, [tau, hInput, hWidth, hAmp]);
+        return tau.map((v) => evaluateHSignal(v));
+    }, [tau, hSource, hInput, hWidth, hAmp, hExprFn]);
 
     // CT: h(t0 - τ) ; DT: h[n0 - k]
     const hFlippedSamples = useMemo(() => {
-    return tau.map((v) => getPresetValue(hInput, t0 - v, hWidth, hAmp));
-    }, [tau, hInput, hWidth, hAmp, t0]);
+        return tau.map((v) => evaluateHSignal(t0 - v));
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExprFn]);
 
     // 
     const hShiftedNotFlippedSamples = useMemo(() => {
-        return tau.map((v) => getPresetValue(hInput, v - t0, hWidth, hAmp));
-    }, [tau, hInput, hWidth, hAmp, t0]);
+        return tau.map((v) => evaluateHSignal(v - t0));
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExprFn]);
 
     // h signal flipped state
     const [isHFlipped, setIsHFlipped] = useState(false);
@@ -214,23 +282,23 @@ export default function ConvolutionPage() {
     const ySamples = useMemo(() => {
         if (!isDiscrete) {
             return tAxis.map((t) => {
-            let sum = 0;
-            
-            //xVal * hVal = product height at one sampled point
-            //sum = total of all sampled heights
-            //sum * dt = approximate area under the product curve
-            for (let i = 0; i < tau.length; i++) {
-                const tauVal = tau[i];
-                const xVal = getPresetValue(xInput, tauVal, xWidth, xAmp);
+                let sum = 0;
+                
+                //xVal * hVal = product height at one sampled point
+                //sum = total of all sampled heights
+                //sum * dt = approximate area under the product curve
+                for (let i = 0; i < tau.length; i++) {
+                    const tauVal = tau[i];
+                    const xVal = evaluateXSignal(tauVal);
 
-                const hVal = isHFlipped
-                    ? getPresetValue(hInput, t - tauVal, hWidth, hAmp)   // convolution
-                    : getPresetValue(hInput, tauVal - t, hWidth, hAmp);  // unflipped shifted
+                    const hVal = isHFlipped
+                        ? evaluateHSignal(t - tauVal)  // convolution
+                        : evaluateHSignal(tauVal - t);  // unflipped shifted
 
-                sum += xVal * hVal;
-            }
-            // Multiply by dt to convert the sampled sum into an approximation of the continuous integral.
-            return sum * dt;
+                    sum += xVal * hVal;
+                }
+                // Multiply by dt to convert the sampled sum into an approximation of the continuous integral.
+                return sum * dt;
             });
         }
 
@@ -238,11 +306,11 @@ export default function ConvolutionPage() {
             let sum = 0;
             for (let i = 0; i < tau.length; i++) {
             const k = tau[i];
-            const xVal = getPresetValue(xInput, k, xWidth, xAmp);
+            const xVal = evaluateXSignal(k);
 
             const hVal = isHFlipped
-                ? getPresetValue(hInput, n - k, hWidth, hAmp)   // convolution
-                : getPresetValue(hInput, k - n, hWidth, hAmp);  // unflipped shifted
+                ? evaluateHSignal(n - k)    // convolution
+                : evaluateHSignal(k - n);  // unflipped shifted
             sum += xVal * hVal;
         }
             return sum;
@@ -263,19 +331,24 @@ export default function ConvolutionPage() {
         return ySamples[bestIdx] ?? 0;
         }, [tAxis, ySamples, t0]);
 
+    const hDisplayLabel = isDiscrete ? (isHFlipped ? "h[n-k]" : "h[n]") : (isHFlipped ? "h(t-τ)" : "h(t)");
+    const xDisplayLabel = isDiscrete ? (isHFlipped ? "x[k]" : "x[n]" ) : (isHFlipped ? "x(τ)": "x(t)"); 
+
+    const xInputExpr = isDiscrete ? (isHFlipped ? "k" : "n") : (isHFlipped ? "τ" : "t" );
+    const hInputExpr = isDiscrete ? (isHFlipped ? "n-k" : "n") : (isHFlipped ? "t-τ" : "t");
 
     // plot data
     const inputTraces = useMemo(() => {
     if (isDiscrete) {
         return [
-        ...makeStemTraces(tau, xSamples, "x[k]", "rgba(34,197,94,0.95)"),
-        ...makeStemTraces(tau, hDisplaySamples, isHFlipped ? "h[n-k]" : "h[n]", "rgba(249,115,22,0.95)"),
+        ...makeStemTraces(tau, xSamples, xDisplayLabel, "rgba(34,197,94,0.95)"),
+        ...makeStemTraces(tau, hDisplaySamples, hDisplayLabel, "rgba(249,115,22,0.95)"),
         {
                 x: tau,
                 y: productSamples,
                 type: isDiscrete ? "bar" : "scatter",
                 mode: isDiscrete ? "" : "lines",
-                name: isDiscrete ? "x[k]h[n-k]" : "x(τ)h(t-τ)",
+                name: xDisplayLabel + "·" + hDisplayLabel,
                 marker: {color: "rgba(255,0,0,0.25)"},
                 fill : "tozeroy",
                 fillcolor: "rgba(255,0,0,0.25)",
@@ -291,7 +364,7 @@ export default function ConvolutionPage() {
             y: xSamples,
             type: "scatter",
             mode: "lines",
-            name: "x(τ)",
+            name: xDisplayLabel,
             marker: {color: "rgba(34,197,94,0.95)"},
         },
         {
@@ -299,7 +372,7 @@ export default function ConvolutionPage() {
             y: hDisplaySamples,
             type: "scatter",
             mode: "lines",
-            name: isHFlipped ? "h(t-τ)" : "h(t)",
+            name: hDisplayLabel,
             marker: { color: "rgba(249,115,22,0.95)" },
         },
         {
@@ -307,7 +380,7 @@ export default function ConvolutionPage() {
             y: productSamples,
             type: "scatter",
             mode: "lines",
-            name: "x(τ)h(t-τ)",
+            name: xDisplayLabel + "·" + hDisplayLabel,
             marker: {color: "rgba(255,0,0,0.25)"},
             fill : "tozeroy",
             fillcolor: "rgba(255,0,0,0.25)",
@@ -389,13 +462,6 @@ export default function ConvolutionPage() {
     const xPad = isDiscrete ? 1 : 0;
     const xLo = tMin - xPad;
     const xHi = tMax + xPad;
-
-    const hDisplayLabel = isDiscrete ? (isHFlipped ? "h[n-k]" : "h[n]") : (isHFlipped ? "h(t-τ)" : "h(t)");
-    const xDisplayLabel = isDiscrete ? "x[n]" : "x(t)";
-
-    const xInputExpr = isDiscrete ? "n" : "t";
-    const hInputExpr = isDiscrete ? (isHFlipped ? "n-k" : "n") : (isHFlipped ? "t-τ" : "t");
-
 
     return (
     <main
@@ -492,6 +558,7 @@ export default function ConvolutionPage() {
                             setWidthValue = {setxWidth}
                             widthText={xWidthText}
                             setWidthText={setxWidthText}
+                            signalLabel={xDisplayLabel}
                         />
                         {/* x amp sliders */}
                         <TextBoxSliders
@@ -507,8 +574,19 @@ export default function ConvolutionPage() {
                             setWidthValue = {setxAmp}
                             widthText={xAmpText}
                             setWidthText={setxAmpText}
+                            signalLabel={xDisplayLabel}
                         />
                     </>
+                )}
+                {xSource === "expression" && (
+                    <CustomExpressionInput
+                        title="Custom Expression for x"
+                        value={xExpr}
+                        setValue={setXExpr}
+                        error={xExprError}
+                        gapBottom={gapBottom}
+                        placeholder={isDiscrete ? "Example: rect(n/3) + sin(PI*n/4)" : "Example: rect(t/2) + sin(2*PI*t)"}
+                    />
                 )}
             </div>
             {/* End of X Panel */}
@@ -570,6 +648,16 @@ export default function ConvolutionPage() {
                         signalLabel={hDisplayLabel}
                     />
                 </>)}
+                {hSource === "expression" && (
+                    <CustomExpressionInput
+                        title="Custom Expression for h"
+                        value={hExpr}
+                        setValue={setHExpr}
+                        error={hExprError}
+                        gapBottom={gapBottom}
+                        placeholder={isDiscrete ? "Example: tri(n/2)" : "Example: exp(-2*t)*u(t)"}
+                    />
+                )}
             </div>
             {/* End of H Panel */}
         </div>
@@ -589,10 +677,11 @@ export default function ConvolutionPage() {
     {/* Signal Plot input X and H overlap */}
     <div style={{marginBottom: gapBottom}}>
         <SignalPlot
-            title={ isDiscrete ? `Input: x[k] and ${isHFlipped ? "h[n-k]" : "h[n]"}`: `Input: x(t) and ${isHFlipped ? "h(t-τ)" : "h(t)"}`}
+            title={ `Input: ${xDisplayLabel} and ${hDisplayLabel}`}
+            // `Input: ${xDisplayLabel} and ${hDisplayLabel}`
             height={signalPlotHeight}
             traces={inputTraces}
-            xLabel={isDiscrete ? "k" : "τ"}
+            xLabel={isDiscrete ? (isHFlipped? "k" : "n") : (isHFlipped ? "τ" : "t")}
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
         />
