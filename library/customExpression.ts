@@ -59,7 +59,30 @@ export function buildExpressionEvaluator(expr: string): ExpressionEvaluator {
 }
 
 //checks whether the typed expression is valid
-export function validateExpression(expr: string): { ok: boolean; error: string } {
+export function validateExpression(
+  expr: string,
+  isDiscrete: boolean
+): { ok: boolean; error: string } {
+  if (expr.trim() === "") {
+    return { ok: true, error: "" };
+  }
+  
+  if (!isDiscrete && (expr.includes("[") || expr.includes("]"))) {
+    return { ok: false, error: "Continuous-time mode uses () and variable t." };
+  }
+
+  if (isDiscrete && (expr.includes("(") || expr.includes(")"))) {
+    return { ok: false, error: "Discrete-time mode uses [] and variable n." };
+  }
+
+  if (isDiscrete && /\bt\b/.test(expr)) {
+    return { ok: false, error: "Discrete-time mode only allows n, not t." };
+  }
+
+  if (!isDiscrete && /\bn\b/.test(expr)) {
+    return { ok: false, error: "Continuous-time mode only allows t, not n." };
+  }
+
   try {
     const evaluator = buildExpressionEvaluator(expr);
     evaluator(0); // test once so undefined variables/functions also get caught

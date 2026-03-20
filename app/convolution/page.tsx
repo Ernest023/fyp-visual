@@ -5,12 +5,13 @@ import Link from "next/link";
 // useMemo - It runs the function only when one of its dependencies changes, otherwise, it reuses the last calculated
 // useRef - It returns a mutable object with a single current property, which you can read from and write to directly
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
 import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
 import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
 import CustomExpressionInput from "@/components/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
+
 
 export const gapBottom = 7
 
@@ -62,8 +63,8 @@ export default function ConvolutionPage() {
     const [hAmpText, sethAmpText] = useState<string>(hAmp.toFixed(2))
 
     // ==== x and h input expression state ====
-    const [xExpr, setXExpr] = useState("rect(t)");
-    const [hExpr, setHExpr] = useState("tri(t)");
+    const [xExpr, setXExpr] = useState("");
+    const [hExpr, setHExpr] = useState("");
 
     // ==== error message for expression state ====
     const [xExprError, setXExprError] = useState("");
@@ -72,8 +73,9 @@ export default function ConvolutionPage() {
     
     const xExprCheck = useMemo(() => {
         if (xSource !== "expression") return { ok: true, error: "" };
+        //trim() removes spaces at start and end
         if (xExpr.trim() === "") return { ok: true, error: "" };
-        return validateExpression(xExpr);
+        return validateExpression(xExpr, isDiscrete)
     }, [xExpr, xSource]);
 
     useEffect(() => {
@@ -91,7 +93,7 @@ export default function ConvolutionPage() {
     const hExprCheck = useMemo(() => {
         if (hSource !== "expression") return { ok: true, error: "" };
         if (hExpr.trim() === "") return { ok: true, error: "" };
-        return validateExpression(hExpr);
+        return validateExpression(hExpr, isDiscrete);
     }, [hExpr, hSource]);
 
     useEffect(() => {
@@ -169,6 +171,13 @@ export default function ConvolutionPage() {
         width: number,
         amplitude: number
     ): number {
+        // DT sine uses different formula due to signal lib setup
+        if (presetId === "sine") {
+            if (isDiscrete) {
+                return amplitude * Math.sin((Math.PI / 4) * inputX);
+            }
+            return amplitude * Math.sin(2 * Math.PI * (inputX / width));
+        }
         const preset = PRESETS.find((p) => p.id === presetId);
         if (!preset) return 0;
 
@@ -186,6 +195,17 @@ export default function ConvolutionPage() {
 	//reference: y(t) = ∫ x(τ) h(t-τ) dτ; y[n] = Σ x[k] h[n-k]
     const { tau, tAxis, dt, tMin, tMax } = useMemo(() => {
     if (!isDiscrete) {
+        if (xSource === "expression" || hSource === "expression") {
+            const domain = 30;
+            const tau = Array.from({ length: 1400 * spm }, (_, i) =>
+                -domain + (2 * domain * i) / (1399 * spm + spmfix)
+            );
+            const tAxis = Array.from({ length: 700 * spm }, (_, i) =>
+                -domain + (2 * domain * i) / (699 * spm + spmfix)
+            );
+            const dt = tau[1] - tau[0];
+            return { tau, tAxis, dt, tMin: -domain, tMax: domain };
+        }
         const base = 2;
         const scale = Math.max(1, xWidth + hWidth + 0.5);
         const domain = base * scale;
@@ -194,10 +214,16 @@ export default function ConvolutionPage() {
         const tAxis = Array.from({ length: 700 * spm }, (_, i) => -domain + (2 * domain * i) / (699 * spm + spmfix));
         // sample step
         const dt = tau[1] - tau[0];
-
         return { tau, tAxis, dt, tMin: -domain, tMax: domain };
     }
+        if (xSource === "expression" || hSource === "expression") {
+            const nMax = 60;
 
+            const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
+            const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
+
+            return { tau, tAxis, dt: 1, tMin: -nMax, tMax: nMax };
+        }
         const WxR = Math.round(xWidth);
         const WhR = Math.round(hWidth);
         const nMax = Math.max(40, WxR + WhR + 6);
@@ -206,10 +232,10 @@ export default function ConvolutionPage() {
         const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
     
         return { tau, tAxis, dt: 1, tMin: -nMax, tMax: nMax };
-    }, [isDiscrete, xWidth, hWidth]);
+    }, [isDiscrete, xSource, hSource, xWidth, hWidth]);
 
     // Current t slider position/value
-    const [t0, setT0] = useState<number>(0);
+    const [t0, setT0] = useState<number>(-2.5);
 
     useEffect(() => {
     setT0((prev) => Math.max(tMin, Math.min(tMax, prev)));
@@ -222,7 +248,7 @@ export default function ConvolutionPage() {
 
         if (xSource === "expression" && xExprFn) {
             if (xExpr.trim() === "" || !xExprFn) return 0;
-            return xAmp * xExprFn(inputX / xWidth);
+            return xExprFn(inputX);
         }
         return 0;
     }
@@ -233,7 +259,7 @@ export default function ConvolutionPage() {
         }
         if (hSource === "expression" && hExprFn) {
             if (hExpr.trim() === "" || !hExprFn) return 0;
-            return hAmp * hExprFn(inputX / hWidth);
+            return hExprFn(inputX);
         }
     return 0;
     }
@@ -243,22 +269,22 @@ export default function ConvolutionPage() {
     // tau = x-positions; xSamples = y-values of x at those positions; hSamples = y-values of h at those positions
     const xSamples = useMemo(() => {
         return tau.map((v) => evaluateXSignal(v));
-    }, [tau, xSource, xInput, xWidth, xAmp, xExprFn]);
+    }, [tau, xSource, xInput, xWidth, xAmp, xExpr, xExprFn]);
 
     // CT: h(t0) ; DT: h[n0] It does not depend on t0, so moving the slider does nothing to it.
     const hSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(v));
-    }, [tau, hSource, hInput, hWidth, hAmp, hExprFn]);
+    }, [tau, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
 
     // CT: h(t0 - τ) ; DT: h[n0 - k]
     const hFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(t0 - v));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExprFn]);
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
 
     // 
     const hShiftedNotFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(v - t0));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExprFn]);
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
 
     // h signal flipped state
     const [isHFlipped, setIsHFlipped] = useState(false);
@@ -315,7 +341,7 @@ export default function ConvolutionPage() {
         }
             return sum;
         });
-    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp]);
+    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp, xExprFn, hExprFn,]);
 
     // Current output value at slider
     const yAtT0 = useMemo(() => {
@@ -463,6 +489,73 @@ export default function ConvolutionPage() {
     const xLo = tMin - xPad;
     const xHi = tMax + xPad;
 
+    // add predefine expression button
+    const quickSnippets = useMemo(() => {
+    if (isDiscrete) {
+        return [
+            "rect[n]",
+            "tri[n]",
+            "u[n]",
+            "ramp[n]",
+            "sgn[n]",
+            "sin[PI*n/4]",
+            "exp[-2*n]*u[n]",
+        ];
+    }
+    return [
+        "rect(t)",
+        "tri(t)",
+        "u(t)",
+        "ramp(t)",
+        "sgn(t)",
+        "sin(2*PI*t)",
+        "exp(-2*t)*u(t)",
+    ];
+    }, [isDiscrete]);
+
+    function appendXSnippet(snippet: string) {
+        setXExpr((prev) => (prev.trim() ? `${prev} + ${snippet}` : snippet));
+    }
+
+    function appendHSnippet(snippet: string) {
+        setHExpr((prev) => (prev.trim() ? `${prev} + ${snippet}` : snippet));
+    }
+    
+    // setting to default state whenever source is changed
+    useEffect(() => {
+        if (xSource === "preset") {
+            setxWidth(1);
+            setxAmp(1);
+            setXInput("rect");
+            setxWidthText(isDiscrete ? "1" : "1.00");
+            setxAmpText("1.00");
+            setT0(isDiscrete ? -2 : -2.5);
+        }
+
+        if (xSource === "expression") {
+            setXExpr("");
+            setXExprError("");
+            setT0(isDiscrete ? -15 : -15);
+        }
+    }, [xSource, isDiscrete]);
+
+    useEffect(() => {
+        if (hSource === "preset") {
+            sethWidth(1);
+            sethAmp(1);
+            setHInput("rect");
+            sethWidthText(isDiscrete ? "1" : "1.00");
+            sethAmpText("1.00");
+            setT0(isDiscrete ? -2 : -2.5);
+        }
+
+        if (hSource === "expression") {
+            setHExpr("");
+            setHExprError("");
+            setT0(isDiscrete ? -15 : -15);
+        }
+    }, [hSource, isDiscrete]);
+
     return (
     <main
         style={{
@@ -585,7 +678,11 @@ export default function ConvolutionPage() {
                         setValue={setXExpr}
                         error={xExprError}
                         gapBottom={gapBottom}
-                        placeholder={isDiscrete ? "Example: rect(n/3) + sin(PI*n/4)" : "Example: rect(t/2) + sin(2*PI*t)"}
+                        placeholder={isDiscrete ? "Example: rect[n/3] + sin[PI*n/4]" : "Example: rect(t/2) + sin(2*PI*t)"}
+                        parsedOk={xExprCheck.ok}
+                        quickSnippets={quickSnippets}
+                        onAppendSnippet={appendXSnippet}
+                        clearAriaLabel="Clear x expression"
                     />
                 )}
             </div>
@@ -655,7 +752,11 @@ export default function ConvolutionPage() {
                         setValue={setHExpr}
                         error={hExprError}
                         gapBottom={gapBottom}
-                        placeholder={isDiscrete ? "Example: tri(n/2)" : "Example: exp(-2*t)*u(t)"}
+                        placeholder={isDiscrete ? "Example: tri[n/2]" : "Example: exp(-2*t)*u(t)"}
+                        parsedOk={hExprCheck.ok}
+                        quickSnippets={quickSnippets}
+                        onAppendSnippet={appendHSnippet}
+                        clearAriaLabel="Clear h expression"
                     />
                 )}
             </div>
