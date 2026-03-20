@@ -563,8 +563,8 @@ export default function ConvolutionPage() {
         padding: "10px 12px 40px 12px",
         boxSizing: "border-box",
         overflow: "hidden",
-        backgroundColor: backgroundColor,
         color: "#ffffff",
+        background: "rgb(0, 0, 0)"
         }}
     >
 
