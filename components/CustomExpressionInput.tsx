@@ -14,6 +14,8 @@ type CustomExpressionInputProps = {
   quickSnippets?: string[];
   onAppendSnippet?: (snippet: string) => void;
   clearAriaLabel?: string;
+
+  isDiscrete: boolean;
 };
 
 const clearBtnStyle: React.CSSProperties = {
@@ -45,6 +47,7 @@ export default function CustomExpressionInput({
   quickSnippets = [],
   onAppendSnippet,
   clearAriaLabel = "Clear expression",
+  isDiscrete,
 }: CustomExpressionInputProps) {
   const trimmedValue = value.trim();
   return (
@@ -93,26 +96,41 @@ export default function CustomExpressionInput({
       
       {quickSnippets.length > 0 && (
         <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {quickSnippets.map((snippet) => (
-            <button
-              key={snippet}
-              onClick={() => onAppendSnippet?.(snippet)}
-              style={{
-                height: 26,
-                padding: "0 10px",
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.30)",
-                background: "transparent",
-                color: "white",
-                cursor: "pointer",
-                fontWeight: 800,
-                fontFamily: "monospace",
-                fontSize: 12,
-              }}
-            >
-              {snippet}
-            </button>
-          ))}
+          {quickSnippets.map((snippet) => {
+            let tooltip: string | undefined;
+
+            if (!isDiscrete && snippet === "sin(2*PI*t)") {
+              tooltip =
+                "f is omitted because the default continuous-time frequency is f = 1, so sin(2πft) becomes sin(2πt).";
+            }
+
+            if (isDiscrete && snippet === "sin[PI*n/4]") {
+              tooltip =
+                "In discrete time, the sine is written as sin(ωn). Here ω = π/4, which gives a period of 8 samples.";
+            }
+
+            return (
+              <button
+                key={snippet}
+                onClick={() => onAppendSnippet?.(snippet)}
+                title={tooltip}
+                style={{
+                  height: 26,
+                  padding: "0 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.30)",
+                  background: "transparent",
+                  color: "white",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                }}
+              >
+                {snippet}
+              </button>
+            );
+          })}
         </div>
       )}
       

@@ -11,12 +11,14 @@ import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSour
 import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
 import CustomExpressionInput from "@/components/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
+import DrawSignalControls from "@/components/DrawSignalControls";
+import DrawSignalPanel from "@/components/DrawSignalPanel";
 
 
 export const gapBottom = 7
 
 export const borderColor = "1px solid rgba(255,255,255,0.35)"
-export const backgroundColor = "1px solid rgba(0,0,0,0.25)"
+export const backgroundColor = "rgb(0, 0, 0)"
 
 export default function ConvolutionPage() {
     type TimeMode = "continuous" | "discrete";
@@ -241,6 +243,39 @@ export default function ConvolutionPage() {
     setT0((prev) => Math.max(tMin, Math.min(tMax, prev)));
     }, [tMin, tMax]);
 
+    // ---- draw ----
+
+    const [showDrawModalX, setShowDrawModalX] = useState(false);
+    const [showDrawModalH, setShowDrawModalH] = useState(false);
+
+    const [xDrawn, setXDrawn] = useState<number[]>([]);
+    const [hDrawn, setHDrawn] = useState<number[]>([]);
+
+    const [Ax, setAx] = useState(1);
+    const [Ah, setAh] = useState(1);
+
+    const [AxText, setAxText] = useState("1.00");
+    const [AhText, setAhText] = useState("1.00");
+
+    const AxMin = -10, AxMax = 10, AxStep = 0.01;
+    const AhMin = -10, AhMax = 10, AhStep = 0.01;
+
+    useEffect(() => {
+        setXDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
+        setHDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
+    }, [tau]);
+
+    function getDrawnValue(inputX: number, axis: number[], drawn: number[]) {
+        if (axis.length === 0 || drawn.length === 0) return 0;
+        if (axis.length === 1) return drawn[0] ?? 0;
+
+        const step = axis[1] - axis[0];
+        const idx = Math.round((inputX - axis[0]) / step);
+        const clampedIdx = Math.max(0, Math.min(axis.length - 1, idx));
+
+        return drawn[clampedIdx] ?? 0;
+    }
+
     function evaluateXSignal(inputX: number): number {
         if (xSource === "preset") {
             return getPresetValue(xInput, inputX, xWidth, xAmp);
@@ -249,6 +284,9 @@ export default function ConvolutionPage() {
         if (xSource === "expression" && xExprFn) {
             if (xExpr.trim() === "" || !xExprFn) return 0;
             return xExprFn(inputX);
+        }
+        if (xSource === "draw") {
+            return Ax * getDrawnValue(inputX, tau, xDrawn);
         }
         return 0;
     }
@@ -261,6 +299,9 @@ export default function ConvolutionPage() {
             if (hExpr.trim() === "" || !hExprFn) return 0;
             return hExprFn(inputX);
         }
+        if (hSource === "draw") {
+            return Ah * getDrawnValue(inputX, tau, hDrawn);
+        }
     return 0;
     }
 
@@ -269,22 +310,22 @@ export default function ConvolutionPage() {
     // tau = x-positions; xSamples = y-values of x at those positions; hSamples = y-values of h at those positions
     const xSamples = useMemo(() => {
         return tau.map((v) => evaluateXSignal(v));
-    }, [tau, xSource, xInput, xWidth, xAmp, xExpr, xExprFn]);
+    }, [tau, xSource, xInput, xWidth, xAmp, xExpr, xExprFn, xDrawn, Ax]);
 
     // CT: h(t0) ; DT: h[n0] It does not depend on t0, so moving the slider does nothing to it.
     const hSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(v));
-    }, [tau, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
+    }, [tau, hSource, hInput, hWidth, hAmp, hExpr, hExprFn,hDrawn, Ah]);
 
     // CT: h(t0 - τ) ; DT: h[n0 - k]
     const hFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(t0 - v));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn, hDrawn, Ah]);
 
     // 
     const hShiftedNotFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(v - t0));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn]);
+    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn, hDrawn, Ah]);
 
     // h signal flipped state
     const [isHFlipped, setIsHFlipped] = useState(false);
@@ -341,7 +382,7 @@ export default function ConvolutionPage() {
         }
             return sum;
         });
-    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp, xExprFn, hExprFn,]);
+    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp, xExprFn, hExprFn,xSource,hSource,xDrawn,hDrawn,Ax,Ah,]);
 
     // Current output value at slider
     const yAtT0 = useMemo(() => {
@@ -543,7 +584,7 @@ export default function ConvolutionPage() {
         if (hSource === "preset") {
             sethWidth(1);
             sethAmp(1);
-            setHInput("rect");
+            setHInput("tri");
             sethWidthText(isDiscrete ? "1" : "1.00");
             sethAmpText("1.00");
             setT0(isDiscrete ? -2 : -2.5);
@@ -556,6 +597,21 @@ export default function ConvolutionPage() {
         }
     }, [hSource, isDiscrete]);
 
+    const modalH = Math.min(0.92 * vh, 760);
+    const drawCanvasH = Math.max(260, Math.floor(modalH - 120));
+
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+            setShowDrawModalX(false);
+            setShowDrawModalH(false);
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, []);
+
     return (
     <main
         style={{
@@ -564,7 +620,7 @@ export default function ConvolutionPage() {
         boxSizing: "border-box",
         overflow: "hidden",
         color: "#ffffff",
-        background: "rgb(0, 0, 0)"
+        background: backgroundColor
         }}
     >
 
@@ -683,6 +739,24 @@ export default function ConvolutionPage() {
                         quickSnippets={quickSnippets}
                         onAppendSnippet={appendXSnippet}
                         clearAriaLabel="Clear x expression"
+                        isDiscrete={isDiscrete}
+                    />
+                )}
+                {xSource === "draw" && (
+                    <DrawSignalControls
+                        signalName="x"
+                        amplitude={Ax}
+                        amplitudeText={AxText}
+                        setAmplitude={setAx}
+                        setAmplitudeText={setAxText}
+                        amplitudeMin={AxMin}
+                        amplitudeMax={AxMax}
+                        amplitudeStep={AxStep}
+                        onOpen={() => setShowDrawModalX(true)}
+                        onClear={() => setXDrawn(Array(tau.length).fill(0))}
+                        isDiscrete = {isDiscrete}
+                        signalLabel = {xDisplayLabel}
+                        varLetter = {varLetter}
                     />
                 )}
             </div>
@@ -757,6 +831,24 @@ export default function ConvolutionPage() {
                         quickSnippets={quickSnippets}
                         onAppendSnippet={appendHSnippet}
                         clearAriaLabel="Clear h expression"
+                        isDiscrete={isDiscrete}
+                    />
+                )}
+                {hSource === "draw" && (
+                    <DrawSignalControls
+                        signalName="h"
+                        amplitude={Ah}
+                        amplitudeText={AhText}
+                        setAmplitude={setAh}
+                        setAmplitudeText={setAhText}
+                        amplitudeMin={AhMin}
+                        amplitudeMax={AhMax}
+                        amplitudeStep={AhStep}
+                        onOpen={() => setShowDrawModalH(true)}
+                        onClear={() => setHDrawn(Array(tau.length).fill(0))}
+                        isDiscrete = {isDiscrete}
+                        signalLabel = {hDisplayLabel}
+                        varLetter = {varLetter}
                     />
                 )}
             </div>
@@ -804,6 +896,42 @@ export default function ConvolutionPage() {
         />
     </div>
     {/* End of Signal Plot output convolution */}
+
+    {/* show Drawing panel */}
+    {xSource === "draw" && showDrawModalX && (
+        <DrawSignalPanel
+            open={xSource === "draw" && showDrawModalX}
+            onClose={() => setShowDrawModalX(false)}
+            title={`Draw ${xDisplayLabel}`}
+            tau={tau}
+            samples={xDrawn}
+            onChange={setXDrawn}
+            onClear={() => setXDrawn(Array(tau.length).fill(0))}
+            yMin={-Ax}
+            yMax={Ax}
+            canvasHeight={drawCanvasH}
+            modalHeight={modalH}
+            discrete={isDiscrete}
+        />
+    )}
+
+    {xSource === "draw" && showDrawModalH && (
+        <DrawSignalPanel
+            open={hSource === "draw" && showDrawModalH}
+            onClose={() => setShowDrawModalH(false)}
+            title={`Draw ${hDisplayLabel}`}
+            tau={tau}
+            samples={hDrawn}
+            onChange={setHDrawn}
+            onClear={() => setHDrawn(Array(tau.length).fill(0))}
+            yMin={-Ah}
+            yMax={Ah}
+            canvasHeight={drawCanvasH}
+            modalHeight={modalH}
+            discrete={isDiscrete}
+        />
+    )}
+
     </main>
     );
 }
