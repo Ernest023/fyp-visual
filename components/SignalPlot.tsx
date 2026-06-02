@@ -58,6 +58,7 @@ export default function SignalPlot({
   yLabel,
   xRange,
   yRange,
+  compact = false,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -68,6 +69,7 @@ export default function SignalPlot({
   yLabel?: string;
   xRange?: [number, number];
   yRange?: [number, number];
+  compact?: boolean;
 }) {
   const pad = 8;
   const titleH = subtitle ? 44 : 26;
@@ -94,7 +96,7 @@ export default function SignalPlot({
       }}
     >
       <div style={{ lineHeight: 1.2 }}>
-        <div style={{ fontWeight: 850, fontSize: 18 }}>{title}</div>
+        <div style={{ fontWeight: 850, fontSize: compact ? 14 : 18 }}>{title}</div>
 
         {subtitle ? (
           <div
@@ -118,7 +120,12 @@ export default function SignalPlot({
         data={traces}
         layout={{
           height: plotHeight,
-          margin: { l: 60, r: 18, t: 10, b: 48 + 10 },
+          margin: {
+            l: compact ? 42 : 60,
+            r: compact ? 8 : 18,
+            t: 10,
+            b: compact ? 42 : 48 + 10,
+          },
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "white",
 

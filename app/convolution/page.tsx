@@ -27,6 +27,16 @@ export default function ConvolutionPage() {
     const [timeMode, setTimeMode] = useState<TimeMode>("continuous");
     const isDiscrete = timeMode === "discrete";
 
+    // Mobile mode
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const update = () => setIsMobile(window.innerWidth < 768);
+        update();
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+
     // X and H Panel source Letters
     const varLetter = isDiscrete ? "[n]" : "[t]";
 
@@ -164,7 +174,7 @@ export default function ConvolutionPage() {
     const bottomSafeHeight = 46;
     const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
     const availableHeight = Math.max(240, remainingHeight); //use highest value
-    const signalPlotHeight = Math.floor((availableHeight - gapBottom) / 2 );
+    const signalPlotHeight = isMobile ? 360 : Math.floor((availableHeight - gapBottom) / 2);
 
     // evaluate the chosen preset signal at that x-value
     function getPresetValue(
@@ -615,17 +625,18 @@ export default function ConvolutionPage() {
     return (
     <main
         style={{
-        height: "100vh",
-        padding: "10px 12px 40px 12px",
+        minHeight: "100vh",
+        height: isMobile ? "auto" : "100vh",
+        padding: isMobile ? "8px 8px 28px 8px" : "10px 12px 40px 12px",
         boxSizing: "border-box",
-        overflow: "hidden",
+        overflow: isMobile ? "auto" : "hidden",
         color: "#ffffff",
-        background: backgroundColor
+        background: backgroundColor,
         }}
     >
 
     {/* Header; 3 column; 1fr at back to center title */}
-    <div ref={headerRef} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
+    <div ref={headerRef} style={{ display: "grid", gridTemplateColumns: isMobile ? "auto 1fr" : "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
         {/* Back Link */}
         <div>
             <Link
@@ -643,7 +654,9 @@ export default function ConvolutionPage() {
             </Link>
         </div>
         {/* Title */}
-        <h1 style={{ fontSize: 22, fontWeight: 750, margin: 0, justifySelf:"center"}}>Convolution Canvas (Interactive)</h1>
+        <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 750, margin: 0, justifySelf: "center",}}>
+            Convolution Canvas (Interactive)
+        </h1>
     </div>
     {/* End of header */}
 
@@ -666,7 +679,7 @@ export default function ConvolutionPage() {
         </div>
 
         {/* X and H Panels */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap:12}}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12}}>
             {/* X Panel */}
             <div>
                 <SignalSourceSelection
@@ -877,6 +890,7 @@ export default function ConvolutionPage() {
             xLabel={isDiscrete ? (isHFlipped? "k" : "n") : (isHFlipped ? "τ" : "t")}
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
+            compact={isMobile}
         />
 
         
@@ -893,6 +907,7 @@ export default function ConvolutionPage() {
             xLabel={isDiscrete ? "n" : "t"}
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
+            compact={isMobile}
         />
     </div>
     {/* End of Signal Plot output convolution */}

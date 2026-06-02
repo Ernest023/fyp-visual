@@ -97,7 +97,7 @@ export function TextBoxSliders({
     TextBoxSlidersProps){
     return (
         <div>
-            <div style={ {fontWeight: 650, fontSize:11, opacity:0.95, display: "flex", gap: 8, alignItems: "center" } }>
+            <div style={ {fontWeight: 650, fontSize:11, opacity:0.95, display: "flex", gap: 8, alignItems: "center",flexWrap: "wrap", } }>
                 {/* if signallabel is undefine or null return right else return signallabel*/}
                 <span>{signalLabel ?? `${signalName}${varLetter}`} {strWidthAmp}:</span>
                 {/* input text box */}
@@ -214,7 +214,7 @@ export function SignalSourceSelection({
     }: 
     SignalSourceSelectionProps) {
     return (
-        <div style={{ fontWeight:850, display:"flex", alignItems:"center", gap:8, marginBottom:gapBottom}}>
+        <div style={{ fontWeight:850, display:"flex", alignItems:"center", gap:8, marginBottom:gapBottom, flexWrap: "wrap",}}>
             <span>{signalName}{varLetter} source:</span>
             <ButtonToggle label="Preset" active={source === "preset"} onClick={() => setSource("preset")}/>
             <ButtonToggle label="Custom Expression" active={source === "expression"} onClick={() => setSource("expression")}/>
