@@ -29,6 +29,7 @@ export default function ConvolutionPage() {
 
     // Mobile mode
     const [isMobile, setIsMobile] = useState(false);
+    const [isMobileM, setIsMobileM] = useState(false);
 
     useEffect(() => {
         const update = () => setIsMobile(window.innerWidth < 768);
@@ -36,6 +37,14 @@ export default function ConvolutionPage() {
         window.addEventListener("resize", update);
         return () => window.removeEventListener("resize", update);
     }, []);
+
+    useEffect(() => {
+        const update = () => setIsMobileM(window.innerWidth < 1400);
+        update();
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+    
 
     // X and H Panel source Letters
     const varLetter = isDiscrete ? "[n]" : "[t]";
@@ -632,6 +641,7 @@ export default function ConvolutionPage() {
         overflow: isMobile ? "auto" : "hidden",
         color: "#ffffff",
         background: backgroundColor,
+        fontSize: isMobile ? "0.9rem" : "1rem"
         }}
     >
 
@@ -891,6 +901,7 @@ export default function ConvolutionPage() {
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
             compact={isMobile}
+            compactM={isMobileM}
         />
 
         
@@ -908,6 +919,7 @@ export default function ConvolutionPage() {
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
             compact={isMobile}
+            compactM={isMobileM}
         />
     </div>
     {/* End of Signal Plot output convolution */}

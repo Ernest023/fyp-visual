@@ -59,6 +59,7 @@ export default function SignalPlot({
   xRange,
   yRange,
   compact = false,
+  compactM = false,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -70,6 +71,7 @@ export default function SignalPlot({
   xRange?: [number, number];
   yRange?: [number, number];
   compact?: boolean;
+  compactM?: boolean;
 }) {
   const pad = 8;
   const titleH = subtitle ? 44 : 26;
@@ -121,10 +123,10 @@ export default function SignalPlot({
         layout={{
           height: plotHeight,
           margin: {
-            l: compact ? 42 : 60,
+            l: compact ? 60 : 80,
             r: compact ? 8 : 18,
             t: 10,
-            b: compact ? 42 : 48 + 10,
+            b: compact ? 42 : compactM ? 48 + 30 : 48 + 10,
           },
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "white",
@@ -176,6 +178,7 @@ export default function SignalPlot({
               ? {
                   text: yLabel,
                   font: { color: axisColor, size: 14 },
+                  standoff: 20,
                 }
               : undefined,
           },
