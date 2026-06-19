@@ -302,3 +302,118 @@ export default function SignalSourcePreset({
             </div>
         );  
 }
+
+export function ParameterSlider({
+  label,
+  value,
+  setValue,
+  text,
+  setText,
+  minRange,
+  maxRange,
+  stepRange,
+  roundOnBlur = false,
+}: {
+  label: string;
+  value: number;
+  setValue: (value: number) => void;
+  text: string;
+  setText: (text: string) => void;
+  minRange: number;
+  maxRange: number;
+  stepRange: number;
+  roundOnBlur?: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div
+        style={{
+          fontWeight: 650,
+          fontSize: 11,
+          opacity: 0.95,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          flexWrap: "wrap",
+          marginBottom: 3,
+        }}
+      >
+        <span>{label}:</span>
+
+        <input
+          type="text"
+          inputMode="decimal"
+          value={text}
+          onChange={(e) => {
+            const s = e.target.value;
+            setText(s);
+
+            const v = parseFloat(s);
+            if (!Number.isNaN(v)) {
+              setValue(v);
+            }
+          }}
+          onBlur={() => {
+            const v = parseFloat(text);
+
+            if (Number.isNaN(v)) {
+              setText(value.toFixed(2));
+              return;
+            }
+
+            let vv = v;
+
+            if (vv < minRange) vv = minRange;
+            if (vv > maxRange) vv = maxRange;
+
+            if (roundOnBlur) {
+              vv = Math.round(vv);
+            }
+
+            setValue(vv);
+            setText(roundOnBlur ? String(vv) : vv.toFixed(2));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              (e.currentTarget as HTMLInputElement).blur();
+            }
+          }}
+          style={{
+            border: "1px solid rgba(255,255,255,0.35)",
+            height: 22,
+            width: 72,
+            borderRadius: 6,
+            outline: "none",
+            fontSize: 12,
+            fontFamily: "monospace",
+            padding: "0 6px",
+            color: "white",
+            background: "black",
+          }}
+        />
+
+        <span>
+          [{minRange.toFixed(2)}, {maxRange.toFixed(2)}]
+        </span>
+      </div>
+
+      <input
+        type="range"
+        style={{
+          width: "100%",
+          height: 14,
+        }}
+        min={minRange}
+        max={maxRange}
+        step={stepRange}
+        value={value}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+
+          setValue(v);
+          setText(v.toFixed(2));
+        }}
+      />
+    </div>
+  );
+}

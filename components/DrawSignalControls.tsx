@@ -20,10 +20,6 @@ type DrawSignalControlsProps = {
   varLetter: string;
 };
 
-function clamp(v: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, v));
-}
-
 export default function DrawSignalControls({
     signalName,
     amplitude,
@@ -47,20 +43,20 @@ export default function DrawSignalControls({
         </div>
         <div>
             <TextBoxSliders
-            signalName = {signalName}
-            varLetter = {varLetter}
-            strWidthAmp = "width"
-            isDiscrete = {isDiscrete}
-            roundOnDiscrete={true}
-            minRange = {amplitudeMin}
-            maxRange = {amplitudeMax}
-            stepRange = {amplitudeStep}
-            widthValue = {amplitude}
-            setWidthValue = {setAmplitude}
-            widthText={amplitudeText}
-            setWidthText={setAmplitudeText}
-            signalLabel={signalLabel}
-        />
+              signalName = {signalName}
+              varLetter = {varLetter}
+              strWidthAmp = "Amplitude"
+              isDiscrete = {isDiscrete}
+              roundOnDiscrete={true}
+              minRange = {amplitudeMin}
+              maxRange = {amplitudeMax}
+              stepRange = {amplitudeStep}
+              widthValue = {amplitude}
+              setWidthValue = {setAmplitude}
+              widthText={amplitudeText}
+              setWidthText={setAmplitudeText}
+              signalLabel={signalLabel}
+            />
         </div>
     </>
   );

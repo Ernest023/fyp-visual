@@ -98,7 +98,7 @@ export default function SignalPlot({
       }}
     >
       <div style={{ lineHeight: 1.2 }}>
-        <div style={{ fontWeight: 850, fontSize: compact ? 14 : 18 }}>{title}</div>
+        <div style={{ fontWeight: 850, fontSize: compact ? 14 : 16 }}>{title}</div>
 
         {subtitle ? (
           <div
@@ -123,7 +123,7 @@ export default function SignalPlot({
         layout={{
           height: plotHeight,
           margin: {
-            l: compact ? 60 : 80,
+            l: compact ? 50 : 80,
             r: compact ? 8 : 18,
             t: 10,
             b: compact ? 42 : compactM ? 48 + 30 : 48 + 10,
@@ -178,7 +178,7 @@ export default function SignalPlot({
               ? {
                   text: yLabel,
                   font: { color: axisColor, size: 14 },
-                  standoff: 20,
+                  standoff: 10,
                 }
               : undefined,
           },
