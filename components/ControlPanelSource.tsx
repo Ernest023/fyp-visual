@@ -2,6 +2,7 @@
 
 import { PresetInput } from "@/library/signal";
 import { borderColor, backgroundColor } from "@/app/convolution/page";
+import { InlineMath } from "react-katex";
 
 export type SourceMode = "preset" | "expression" | "draw";
 
@@ -59,13 +60,13 @@ type TSlidersProps = {
     isDiscrete: boolean;
 };
 
-export function ButtonToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void;}) {
+export function ButtonToggle({ label, active, onClick }: { label: React.ReactNode; active: boolean; onClick: () => void;}) {
   return (
     <button
         onClick={onClick}
         style={{
             height: 30,
-            padding: "0 10px",
+            padding: "2px 10px 30px 10px",
             borderRadius: 10,
             border: borderColor,
             background: active ? "rgba(255, 255, 255, 0.25)" : "transparent",
@@ -215,7 +216,10 @@ export function SignalSourceSelection({
     SignalSourceSelectionProps) {
     return (
         <div style={{ fontWeight:850, display:"flex", alignItems:"center", gap:8, marginBottom:gapBottom, flexWrap: "wrap",}}>
-            <span>{signalName}{varLetter} source:</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <InlineMath math={`${signalName}${varLetter}`} />
+                <span>source:</span>
+            </span>
             <ButtonToggle label="Preset" active={source === "preset"} onClick={() => setSource("preset")}/>
             <ButtonToggle label="Custom Expression" active={source === "expression"} onClick={() => setSource("expression")}/>
             <ButtonToggle label="Draw" active={source === "draw"} onClick={() => setSource("draw")}/>
@@ -258,7 +262,7 @@ function formatPresetExpression(
             return `${ampStr}sin(2π·${scaledExpr})`;
 
         case "exp":
-            return `${ampStr}e^(-2·${scaledExpr})u(${scaledExpr})`;
+            return `e^{-2${inputExpr}}·u(${inputExpr})`;
 
         case "imp":
             return `${ampStr}δ(${scaledExpr})`;
@@ -284,8 +288,9 @@ export default function SignalSourcePreset({
             <div>
                 {/* dropdown list input */}
                 <label>{/* input */}
-                    <div>
-                        Preset: {displaySignalLabel} = {presetText}
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                        <span>Preset:</span>
+                        <InlineMath math={`${displaySignalLabel}=${presetText}`} />
                     </div>
                     {/* dropdown */}
                     <select 

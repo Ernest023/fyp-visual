@@ -13,6 +13,7 @@ import CustomExpressionInput from "@/components/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
 import DrawSignalControls from "@/components/DrawSignalControls";
 import DrawSignalPanel from "@/components/DrawSignalPanel";
+import { InlineMath } from "react-katex";
 
 
 export const gapBottom = 7
@@ -47,7 +48,7 @@ export default function ConvolutionPage() {
     
 
     // X and H Panel source Letters
-    const varLetter = isDiscrete ? "[n]" : "[t]";
+    const varLetter = isDiscrete ? "[n]" : "(t)";
 
     // ===== x source + h source ===== sources is default at preset
     const [xSource, setXSource] = useState<SourceMode>("preset");
@@ -420,6 +421,18 @@ export default function ConvolutionPage() {
     const hDisplayLabel = isDiscrete ? (isHFlipped ? "h[n-k]" : "h[n]") : (isHFlipped ? "h(t-τ)" : "h(t)");
     const xDisplayLabel = isDiscrete ? (isHFlipped ? "x[k]" : "x[n]" ) : (isHFlipped ? "x(τ)": "x(t)"); 
 
+    const xDisplayMath = isDiscrete ? (
+        isHFlipped ? <InlineMath math="x[k]" /> : <InlineMath math="x[n]" />
+    ) : (
+        isHFlipped ? <InlineMath math="x(\tau)" /> : <InlineMath math="x(t)" />
+    );
+
+    const hDisplayMath = isDiscrete ? (
+        isHFlipped ? <InlineMath math="h[n-k]" /> : <InlineMath math="h[n]" />
+    ) : (
+        isHFlipped ? <InlineMath math="h(t-\tau)" /> : <InlineMath math="h(t)" />
+    );
+
     const xInputExpr = isDiscrete ? (isHFlipped ? "k" : "n") : (isHFlipped ? "τ" : "t" );
     const hInputExpr = isDiscrete ? (isHFlipped ? "n-k" : "n") : (isHFlipped ? "t-τ" : "t");
 
@@ -551,26 +564,39 @@ export default function ConvolutionPage() {
 
     // add predefine expression button
     const quickSnippets = useMemo(() => {
-    if (isDiscrete) {
+        if (isDiscrete) {
+            return [
+            { text: "rect[n]", display: "\\operatorname{rect}[n]" },
+            { text: "tri[n]", display: "\\operatorname{tri}[n]" },
+            { text: "u[n]", display: "u[n]" },
+            { text: "ramp[n]", display: "\\operatorname{ramp}[n]" },
+            { text: "sgn[n]", display: "\\operatorname{sgn}[n]" },
+            {
+                text: "sin[PI*n/4]",
+                display: "\\sin\\left(\\frac{\\pi n}{4}\\right)",
+            },
+            {
+                text: "exp[-2*n]*u[n]",
+                display: "\\mathrm{e}^{-2n}u[n]",
+            },
+            ];
+        }
+
         return [
-            "rect[n]",
-            "tri[n]",
-            "u[n]",
-            "ramp[n]",
-            "sgn[n]",
-            "sin[PI*n/4]",
-            "exp[-2*n]*u[n]",
+            { text: "rect(t)", display: "\\operatorname{rect}(t)" },
+            { text: "tri(t)", display: "\\operatorname{tri}(t)" },
+            { text: "u(t)", display: "u(t)" },
+            { text: "ramp(t)", display: "\\operatorname{ramp}(t)" },
+            { text: "sgn(t)", display: "\\operatorname{sgn}(t)" },
+            {
+            text: "sin(2*PI*t)",
+            display: "\\sin(2\\pi t)",
+            },
+            {
+            text: "exp(-2*t)*u(t)",
+            display: "\\mathrm{e}^{-2t}u(t)",
+            },
         ];
-    }
-    return [
-        "rect(t)",
-        "tri(t)",
-        "u(t)",
-        "ramp(t)",
-        "sgn(t)",
-        "sin(2*PI*t)",
-        "exp(-2*t)*u(t)",
-    ];
     }, [isDiscrete]);
 
     function appendXSnippet(snippet: string) {
@@ -893,7 +919,7 @@ export default function ConvolutionPage() {
     {/* Signal Plot input X and H overlap */}
     <div style={{marginBottom: gapBottom}}>
         <SignalPlot
-            title={ `Input: ${xDisplayLabel} and ${hDisplayLabel}`}
+            title={<>Input: {xDisplayMath} and {hDisplayMath}</>}
             // `Input: ${xDisplayLabel} and ${hDisplayLabel}`
             height={signalPlotHeight}
             traces={inputTraces}
@@ -911,8 +937,28 @@ export default function ConvolutionPage() {
     {/* Signal Plot output convolution */}
     <div>
         <SignalPlot
-            title={isDiscrete ? 
-                `Output: y[n] = Σ x[k] ${isHFlipped ? "h[n-k]" : "h[k-n]"}` : `Output: y(t) = ∫ x(τ) ${isHFlipped ? "h(t - τ)" : "h(τ - t)"} dτ`}
+            // title={isDiscrete ? 
+            //     `Output: y[n] = Σ x[k] ${isHFlipped ? "h[n-k]" : "h[k-n]"}` : `Output: y(t) = ∫ x(τ) ${isHFlipped ? "h(t - τ)" : "h(τ - t)"} dτ`}
+            title={
+                <>
+                    <strong>Output:&nbsp;</strong>
+                    {
+                        isDiscrete ? (
+                            isHFlipped ? (
+                                <InlineMath math="y[n] = \sum_{k=-\infty}^{\infty} x[k]h[n-k]" />
+                            ) : (
+                                <InlineMath math="y[n] = \sum_{k=-\infty}^{\infty} x[k]h[k-n]" />
+                            )
+                        ) : (
+                            isHFlipped ? (
+                                <InlineMath math="y(t)=\int_{-\infty}^{\infty}x(\tau)⋅h(t-\tau)\,d\tau" />
+                            ) : (
+                                <InlineMath math="y(t)=\int_{-\infty}^{\infty}x(\tau)⋅h(\tau-t)\,d\tau" />
+                            )
+                        )
+                    }
+                </>
+            }
             height={signalPlotHeight}
             traces={outputTraces}
             xLabel={isDiscrete ? "n" : "t"}

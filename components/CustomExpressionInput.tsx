@@ -1,6 +1,12 @@
 "use client";
 
 import { borderColor, backgroundColor } from "@/app/convolution/page";
+import { InlineMath } from "react-katex";
+
+export type QuickSnippet = {
+  text: string;
+  display: string;
+};
 
 type CustomExpressionInputProps = {
   title: string;
@@ -11,7 +17,7 @@ type CustomExpressionInputProps = {
   placeholder?: string;
 
   parsedOk?: boolean;
-  quickSnippets?: string[];
+  quickSnippets?: QuickSnippet[];
   onAppendSnippet?: (snippet: string) => void;
   clearAriaLabel?: string;
 
@@ -99,20 +105,20 @@ export default function CustomExpressionInput({
           {quickSnippets.map((snippet) => {
             let tooltip: string | undefined;
 
-            if (!isDiscrete && snippet === "sin(2*PI*t)") {
+            if (!isDiscrete && snippet.text === "sin(2*PI*t)") {
               tooltip =
                 "f is omitted because the default continuous-time frequency is f = 1, so sin(2πft) becomes sin(2πt).";
             }
 
-            if (isDiscrete && snippet === "sin[PI*n/4]") {
+            if (isDiscrete && snippet.text === "sin[PI*n/4]") {
               tooltip =
                 "In discrete time, the sine is written as sin(ωn). Here ω = π/4, which gives a period of 8 samples.";
             }
 
             return (
               <button
-                key={snippet}
-                onClick={() => onAppendSnippet?.(snippet)}
+                key={snippet.text}
+                onClick={() => onAppendSnippet?.(snippet.text)}
                 title={tooltip}
                 style={{
                   height: 26,
@@ -127,7 +133,7 @@ export default function CustomExpressionInput({
                   fontSize: 12,
                 }}
               >
-                {snippet}
+                <InlineMath math={snippet.display} />
               </button>
             );
           })}
