@@ -266,16 +266,7 @@ export default function FourierPage() {
             <InlineMath
                 math={
                     "x(t)=" +
-                    components
-                        .map(
-                            (c) =>
-                                `${c.amplitude.toFixed(
-                                    2
-                                )}\\sin\\left(2\\pi\\cdot${c.frequency.toFixed(
-                                    2
-                                )}t+${getPhaseSymbol(c.phase)}\\right)`
-                        )
-                        .join("+")
+                    components.map((c) => `${c.amplitude.toFixed(2)}\\sin\\left(2\\pi\\cdot${c.frequency.toFixed(2)}\\cdot\\\\t+${getPhaseSymbol(c.phase)}\\right)`).join("+")
                 }
             />
         </>
@@ -456,7 +447,7 @@ export default function FourierPage() {
                 {pageMode === "sine-builder" && (
                     <>
                         <div style={{ fontWeight: 850, marginBottom: 8 }}>
-                            Build x(t) by summing sine waves
+                            Sine Wave Expression: <InlineMath math={"A\\sin\\left(2\\pi f t + \\phi\\right)"} />
                         </div>
 
                         <div
@@ -516,7 +507,7 @@ export default function FourierPage() {
                                             updateComponentText(c.id, "frequency", s)
                                         }
                                         minRange={0.1}
-                                        maxRange={10}
+                                        maxRange={15}
                                         stepRange={0.1}
                                     />
 
@@ -619,9 +610,9 @@ export default function FourierPage() {
 
                 {pageMode === "rect-sinc-pair" && (
                     <>
-                        <div style={{ fontWeight: 850, marginBottom: 8 }}>
-                            Fourier Transform pair of sinc and rect
-                        </div>
+                        {/* <div style={{ fontWeight: 850, marginBottom: 8 }}>
+                           <InlineMath math="Sinc\;Formula:\;\operatorname{sinc}(t)=\frac{\sin(\pi t)}{\pi t}" />
+                        </div> */}
 
                         <div
                             style={{
@@ -669,8 +660,9 @@ export default function FourierPage() {
                                 active={pairMode === "sinc-to-rect"}
                                 onClick={() => setPairMode("sinc-to-rect")}
                             />
+                            
                         </div>
-
+                        
                         <ParameterSlider
                             label={`Width T = ${pairWidth.toFixed(2)}`}
                             value={pairWidth}
@@ -678,7 +670,7 @@ export default function FourierPage() {
                             text={pairWidthText}
                             setText={setPairWidthText}
                             minRange={0.2}
-                            maxRange={5}
+                            maxRange={10}
                             stepRange={0.01}
                         />
 
@@ -697,18 +689,38 @@ export default function FourierPage() {
                             <div style={{ fontWeight: 800, marginBottom: 6 }}>
                                 Current Transform Pair
                             </div>
+                            
 
                             <div>{pairFormula}</div>
 
                             <div
                                 style={{
-                                    marginTop: 8,
-                                    fontFamily: "system-ui",
-                                    opacity: 0.8,
+                                    marginTop: 12,
+                                    padding: "10px 12px",
+                                    borderRadius: 10,
+                                    background: "rgba(255,255,255,0.05)",
+                                    border: "1px solid rgba(255,255,255,0.15)",
+                                    lineHeight: 1.6,
                                 }}
-                            >
-                                Increasing width in one domain makes the paired
-                                transform narrower in the other domain.
+                                >
+                                <div
+                                    style={{
+                                    fontWeight: 700,
+                                    textDecoration: "underline",
+                                    marginBottom: 8,
+                                    }}
+                                >
+                                    Observation
+                                </div>
+
+                                <div style={{ marginBottom: 8 }}>
+                                    <InlineMath math="\operatorname{sinc}(t)=\frac{\sin(\pi t)}{\pi t}" />
+                                </div>
+
+                                <div style={{ fontSize: 14, opacity: 0.85 }}>
+                                    Increasing the width in one domain makes the corresponding Fourier transform
+                                    narrower in the other domain.
+                                </div>
                             </div>
                         </div>
                     </>

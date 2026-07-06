@@ -240,7 +240,8 @@ function formatPresetExpression(
     inputExpr: string
 ): string {
     const ampStr = amplitude === 1 ? "" : amplitude === -1 ? "-" : `${amplitude}`;
-    const scaledExpr = width === 1 ? inputExpr : `(${inputExpr})/${width}`;
+    // const scaledExpr = width === 1 ? inputExpr : `(${inputExpr})/${width}`;
+    const scaledExpr = width === 1 ? inputExpr : `\\frac{${inputExpr}}{${width}}`;
 
     switch (preset) {
         case "rect":
@@ -262,7 +263,7 @@ function formatPresetExpression(
             return `${ampStr}sin(2π·${scaledExpr})`;
 
         case "exp":
-            return `e^{-2${inputExpr}}·u(${inputExpr})`;
+            return `${ampStr}e^{-2${scaledExpr}}u(${scaledExpr})`;
 
         case "imp":
             return `${ampStr}δ(${scaledExpr})`;
