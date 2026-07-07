@@ -146,28 +146,63 @@ export default function FourierPage() {
     }, [tAxis, components]);
 
     const sineSpectrum = useMemo(() => {
-        const freqs: number[] = [];
-        const mags: number[] = [];
-        const phases: number[] = [];
+    type ComplexValue = {
+        re: number;
+        im: number;
+    };
+
+    const spectrumMap = new Map<string, { frequency: number; value: ComplexValue }>();
+
+    function addToSpectrum(frequency: number, magnitude: number, phase: number) {
+            const key = frequency.toFixed(6);
+
+            const re = magnitude * Math.cos(phase);
+            const im = magnitude * Math.sin(phase);
+
+            const existing = spectrumMap.get(key);
+
+            if (existing) {
+                existing.value.re += re;
+                existing.value.im += im;
+            } else {
+                spectrumMap.set(key, {
+                    frequency,
+                    value: { re, im },
+                });
+            }
+        }
 
         components.forEach((c) => {
             const magnitude = Math.abs(c.amplitude) / 2;
 
-            freqs.push(-c.frequency);
-            mags.push(magnitude);
-            phases.push(wrapPhase(-c.phase + Math.PI / 2));
+            // Positive frequency: phase = φ - π/2
+            addToSpectrum(
+                c.frequency,
+                magnitude,
+                c.phase - Math.PI / 2
+            );
 
-            freqs.push(c.frequency);
-            mags.push(magnitude);
-            phases.push(wrapPhase(c.phase - Math.PI / 2));
+            // Negative frequency: phase = -φ + π/2
+            addToSpectrum(
+                -c.frequency,
+                magnitude,
+                -c.phase + Math.PI / 2
+            );
         });
 
-        const sorted = freqs
-            .map((f, i) => ({
-                frequency: f,
-                magnitude: mags[i],
-                phase: phases[i],
-            }))
+        const sorted = Array.from(spectrumMap.values())
+            .map((item) => {
+                const { re, im } = item.value;
+
+                const magnitude = Math.sqrt(re * re + im * im);
+                const phase = magnitude < 1e-9 ? 0 : wrapPhase(Math.atan2(im, re));
+
+                return {
+                    frequency: item.frequency,
+                    magnitude,
+                    phase,
+                };
+            })
             .sort((a, b) => a.frequency - b.frequency);
 
         return {
@@ -204,13 +239,18 @@ export default function FourierPage() {
     function addComponent() {
         if (components.length >= MAX_SINES) return;
 
-        const nextId = Math.max(...components.map((c) => c.id)) + 1;
+        const nextId =
+            components.length === 0
+                ? 1
+                : Math.max(...components.map((c) => c.id)) + 1;
+
+        const defaultFrequency = Math.min(components.length + 1, 15);
 
         setComponents((prev) => [
             ...prev,
             {
                 id: nextId,
-                frequency: nextId,
+                frequency: defaultFrequency,
                 amplitude: 0.5,
                 phase: 0,
             },
@@ -219,7 +259,7 @@ export default function FourierPage() {
         setComponentTexts((prev) => ({
             ...prev,
             [nextId]: {
-                frequency: nextId.toFixed(2),
+                frequency: defaultFrequency.toFixed(2),
                 amplitude: "0.50",
                 phase: "0.00",
             },
@@ -262,14 +302,92 @@ export default function FourierPage() {
     );
 
     const compositeSignalText = (
-        <>
-            <InlineMath
-                math={
-                    "x(t)=" +
-                    components.map((c) => `${c.amplitude.toFixed(2)}\\sin\\left(2\\pi\\cdot${c.frequency.toFixed(2)}\\cdot\\\\t+${getPhaseSymbol(c.phase)}\\right)`).join("+")
-                }
-            />
-        </>
+        <div
+            style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 4,
+            }}
+        >
+            <InlineMath math="x(t)=" />
+
+            {components.map((c, i) => (
+                <span key={i}>
+                    {i > 0 && <span style={{ color: "white" }}> + </span>}
+
+                    <span style={{ color: componentColors[i] }}>
+                        <InlineMath
+                            math={`${c.amplitude.toFixed(
+                                2
+                            )}\\sin\\left(2\\pi\\cdot${c.frequency.toFixed(
+                                2
+                            )}\\cdot t+${getPhaseSymbol(c.phase)}\\right)`}
+                        />
+                    </span>
+                </span>
+            ))}
+        </div>
+    );
+
+    const fourierTransformText = (
+        <div
+            style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 4,
+            }}
+        >
+            <InlineMath math="X(f)=" />
+
+            {components.map((c, i) => {
+                const mag = (Math.abs(c.amplitude) / 2).toFixed(2);
+
+                return (
+                    <span key={i}>
+                        {i > 0 && <span style={{ color: "white" }}> + </span>}
+
+                        <span style={{ color: componentColors[i] }}>
+                            <InlineMath
+                                math={`${mag}j\\left[\\delta\\left(f+${c.frequency.toFixed(2)}\\right)-\\delta\\left(f-${c.frequency.toFixed(2)}\\right)\\right]`}
+                            />
+                        </span>
+                    </span>
+                );
+            })}
+        </div>
+    );
+
+    const fourierTransformPhaseText = (
+        <div
+            style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 4,
+            }}
+        >
+            <InlineMath math="X(f)=" />
+
+            {components.map((c, i) => {
+                const A = (Math.abs(c.amplitude) / 2).toFixed(2);
+                const f = c.frequency.toFixed(2);
+                const phi = getPhaseSymbol(c.phase);
+
+                return (
+                    <span key={i}>
+                        {i > 0 && <span style={{ color: "white" }}> + </span>}
+
+                        <span style={{ color: componentColors[i] }}>
+                            <InlineMath
+                                math={`${A}e^{j\\left(${phi}-\\frac{\\pi}{2}\\right)}\\delta\\left(f-${f}\\right)+${A}e^{-j\\left(${phi}-\\frac{\\pi}{2}\\right)}\\delta\\left(f+${f}\\right)`}
+                            />
+                        </span>
+                    </span>
+                );
+            })}
+        </div>
     );
 
     const plotHeight = isMobile ? 320 : 250;
@@ -457,7 +575,7 @@ export default function FourierPage() {
                                 gap: 10,
                             }}
                         >
-                            {components.map((c) => (
+                            {components.map((c, index) => (
                                 <div
                                     key={c.id}
                                     style={{
@@ -475,7 +593,26 @@ export default function FourierPage() {
                                             fontWeight: 800,
                                         }}
                                     >
-                                        <span>Sine {c.id}</span>
+                                        <span
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                            }}
+                                        >
+                                            <span>Sine {c.id}</span>
+                                            <span
+                                                style={{
+                                                    width: 10,
+                                                    height: 10,
+                                                    borderRadius: "50%",
+                                                    backgroundColor: componentColors[index % componentColors.length],
+                                                    display: "inline-block",
+                                                    border: "1px solid rgba(255,255,255,0.35)",
+                                                }}
+                                            />
+                                            
+                                        </span>
 
                                         {components.length > 1 && (
                                             <button
@@ -603,7 +740,42 @@ export default function FourierPage() {
                                 Composite Signal
                             </div>
 
-                            <div>{compositeSignalText}</div>
+                            <div style={{ marginBottom: 6 }}>{compositeSignalText}</div>
+
+                            <div
+                                style={{
+                                    paddingTop: 5,
+                                    borderTop: "1px solid rgba(255,255,255,0.15)",
+                                }}
+                            >
+                                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                                    Fourier Transform{": "}
+                                    <span style={{ fontSize: "0.80em" }}>
+                                        <InlineMath math="\mathcal{F}\{\sin(2\pi f_0t)\}= \frac{j}{2}\left[\delta(f+f_0)-\delta(f-f_0)\right]" />
+                                    </span>
+                                </div>
+
+                                
+                                <span style={{ fontSize: "0.9em" }}>
+                                    {fourierTransformText}
+                                </span>
+                            </div>
+
+                            <div
+                                style={{
+                                    paddingTop: 5,
+                                    borderTop: "1px solid rgba(255,255,255,0.15)",
+                                }}
+                            >
+                                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                                    Fourier Transform Equivalent Complex Exponential Form
+                                </div>
+
+                                
+                                <span style={{ fontSize: "0.9em" }}>
+                                    {fourierTransformPhaseText}
+                                </span>
+                            </div>
                         </div>
                     </>
                 )}
@@ -763,7 +935,12 @@ export default function FourierPage() {
                     <div>
                         <div style={{ marginBottom: gapBottom }}>
                             <SignalPlot
-                                title="Magnitude Spectrum"
+                                title={
+                                    <>
+                                        Magnitude Spectrum{" "}
+                                        <InlineMath math="|X(f)|" />
+                                    </>
+                                }
                                 height={plotHeight}
                                 traces={magnitudeTraces}
                                 xLabel="Frequency / Hz"
@@ -774,7 +951,12 @@ export default function FourierPage() {
 
                         <div>
                             <SignalPlot
-                                title="Phase Spectrum"
+                                title={
+                                    <>
+                                        Phase Spectrum{" "}
+                                        <InlineMath math="\angle X(f)" />
+                                    </>
+                                }
                                 height={plotHeight}
                                 traces={phaseTraces}
                                 xLabel="Frequency / Hz"
