@@ -1,15 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import SignalPlot, { makeStemTraces } from "@/components/SignalPlot";
 import { ButtonToggle, ParameterSlider } from "@/components/ControlPanelSource";
 import { borderColor, backgroundColor, gapBottom } from "@/app/convolution/page";
 import { InlineMath, BlockMath } from "react-katex";
 
 
-type PageMode = "sine-builder" | "rect-sinc-pair";
-type PairMode = "rect-to-sinc" | "sinc-to-rect";
+type PageMode = "sine-builder" | "transform-pair";
+
+type PairMode =
+    | "exp-right"
+    | "exp-left"
+    | "double-exp"
+    | "delta"
+    | "constant"
+    | "complex-exp"
+    | "cosine"
+    | "sine"
+    | "step"
+    | "rect-to-sinc"
+    | "triangle"
+    | "sinc-to-rect"
+    | "impulse-train";
+
+type TransformPairConfig = {
+    label: React.ReactNode;
+    formula: string;
+    timeTitle: React.ReactNode;
+    freqTitle: React.ReactNode;
+    timeName: string;
+    freqName: string;
+    timeSamples: number[];
+    freqSamples: number[];
+
+    timeImpulseTraces?: any[];
+    freqImpulseTraces?: any[];
+    timeYRange?: [number, number];
+    freqYRange?: [number, number];
+};
 
 type SineComponent = {
     id: number;
@@ -83,7 +113,7 @@ export default function FourierPage() {
     const [isMobile, setIsMobile] = useState(false);
 
     const [pageMode, setPageMode] = useState<PageMode>("sine-builder");
-    const [pairMode, setPairMode] = useState<PairMode>("rect-to-sinc");
+    const [pairMode, setPairMode] = useState<PairMode>("exp-right");
 
     const [pairWidth, setPairWidth] = useState(1);
     const [pairWidthText, setPairWidthText] = useState("1.00");
@@ -349,15 +379,59 @@ export default function FourierPage() {
                         {i > 0 && <span style={{ color: "white" }}> + </span>}
 
                         <span style={{ color: componentColors[i] }}>
-                            <InlineMath
-                                math={`${mag}j\\left[\\delta\\left(f+${c.frequency.toFixed(2)}\\right)-\\delta\\left(f-${c.frequency.toFixed(2)}\\right)\\right]`}
-                            />
+                            <InlineMath math={`\\frac{${c.amplitude.toFixed(2)}}{2j}\\left[e^{j${getPhaseSymbol(c.phase)}}\\cdot\\delta\\left(f-${c.frequency.toFixed(2)}\\right)-e^{-j${getPhaseSymbol(c.phase)}}\\cdot\\delta\\left(f+${c.frequency.toFixed(2)}\\right)\\right]`}/>
                         </span>
                     </span>
                 );
             })}
         </div>
     );
+
+    function makeImpulseTraces(
+        impulses: { x: number; height: number; label?: string }[],
+        name: string,
+        color = "rgba(37,99,235,0.95)"
+    ) {
+        const stemX: (number | null)[] = [];
+        const stemY: (number | null)[] = [];
+
+        const markerX: number[] = [];
+        const markerY: number[] = [];
+
+        impulses.forEach((impulse) => {
+            stemX.push(impulse.x, impulse.x, null);
+            stemY.push(0, impulse.height, null);
+
+            markerX.push(impulse.x);
+            markerY.push(impulse.height);
+        });
+
+        return [
+            {
+                x: stemX,
+                y: stemY,
+                type: "scatter",
+                mode: "lines",
+                name: `${name} stems`,
+                showlegend: false,
+                line: { color, width: 3 },
+                hoverinfo: "skip",
+            },
+            {
+                x: markerX,
+                y: markerY,
+                type: "scatter",
+                mode: "markers",
+                name,
+                showlegend: false,
+                marker: {
+                    color,
+                    size: 14,
+                    symbol: "triangle-up",
+                },
+            },
+        ];
+    }
 
     const fourierTransformPhaseText = (
         <div
@@ -396,91 +470,319 @@ export default function FourierPage() {
     const freqRange: [number, number] = [-maxFreq - 1, maxFreq + 1];
 
     const pairTimeAxis = useMemo(() => {
-        return Array.from({ length: 900 }, (_, i) => -6 + (12 * i) / 899);
+        return Array.from({ length: 6000 }, (_, i) => -6 + (12 * i) / 5999);
     }, []);
 
     const pairFreqAxis = useMemo(() => {
-        return Array.from({ length: 900 }, (_, i) => -4 + (8 * i) / 899);
+        return Array.from({ length: 6000 }, (_, i) => -10 + (20 * i) / 5999);
     }, []);
 
-    const pairTimeSamples = useMemo(() => {
-        if (pairMode === "rect-to-sinc") {
-            return pairTimeAxis.map((t) => rect(t / pairWidth));
-        }
+    function PairLabel({ math }: { math: string }) {
+        return (
+            <div
+                style={{
+                    fontSize: "14px",
+                    transform: "scale(0.99)",
+                    transformOrigin: "center",
+                    whiteSpace: "nowrap",
+                }}
+            >
+                <InlineMath math={math} />
+            </div>
+        );
+    }
 
-        return pairTimeAxis.map((t) => sinc(t / pairWidth));
-    }, [pairMode, pairTimeAxis, pairWidth]);
+    const transformPairs: Record<PairMode, TransformPairConfig> = {
+        // e^(-at) u(t)
+        "exp-right": {
+            label: <PairLabel math="\mathrm{e}^{-at}u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a+j2\pi f}" />,
+            formula: `\\mathrm{e}^{-${pairWidth.toFixed(2)}t}u(t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}+j2\\pi f},\\quad a>0`,
+            timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{-at}u(t)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{a+j2\pi f}" /></>,
+            timeName: "e^(-at)u(t)",
+            freqName: "1/(a+j2πf)",
+            timeSamples: pairTimeAxis.map((t) => (t >= 0 ? Math.exp(-pairWidth * t) : 0)),
+            freqSamples: pairFreqAxis.map((f) => 1 / Math.sqrt(pairWidth ** 2 + (2 * Math.PI * f) ** 2)),
+        },
 
-    const pairFreqSamples = useMemo(() => {
-        if (pairMode === "rect-to-sinc") {
-            return pairFreqAxis.map((f) => pairWidth * sinc(pairWidth * f));
-        }
+        "exp-left": {
+            label: <PairLabel math="\mathrm{e}^{at}u(-t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a-j2\pi f}" />,
+            formula: `\\mathrm{e}^{${pairWidth.toFixed(2)}t}u(-t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}-j2\\pi f},\\quad a>0`,
+            timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{at}u(-t)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{a-j2\pi f}" /></>,
+            timeName: "e^(at)u(-t)",
+            freqName: "1/(a-j2πf)",
+            timeSamples: pairTimeAxis.map((t) => (t <= 0 ? Math.exp(pairWidth * t) : 0)),
+            freqSamples: pairFreqAxis.map((f) => 1 / Math.sqrt(pairWidth ** 2 + (2 * Math.PI * f) ** 2)),
+        },
 
-        return pairFreqAxis.map((f) => pairWidth * rect(pairWidth * f));
-    }, [pairMode, pairFreqAxis, pairWidth]);
+        // e^(-a|t|)
+        "double-exp": {
+            label: <PairLabel math="\mathrm{e}^{-a|t|}\overset{\mathcal F}{\longleftrightarrow}\frac{2a}{a^2+(2\pi f)^2}" />,
+            formula: `\\mathrm{e}^{-${pairWidth.toFixed(2)}|t|}\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{2(${pairWidth.toFixed(2)})}{(${pairWidth.toFixed(2)})^2+(2\\pi f)^2}`,
+            timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{-a|t|}" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\frac{2a}{a^2+(2\pi f)^2}" /></>,
+            timeName: "e^(-a|t|)",
+            freqName: "2a/(a²+(2πf)²)",
+            timeSamples: pairTimeAxis.map((t) => Math.exp(-pairWidth * Math.abs(t))),
+            freqSamples: pairFreqAxis.map((f) => (2 * pairWidth) / (pairWidth ** 2 + (2 * Math.PI * f) ** 2)),
+        },
 
-    const pairTimeTraces = [
+        delta: {
+        label: <PairLabel math="\delta(t)\overset{\mathcal F}{\longleftrightarrow}1" />,
+        formula: "\\delta(t)\\overset{\\mathcal F}{\\longleftrightarrow}1",
+        timeTitle: <>Time Domain: <InlineMath math="\delta(t)" /></>,
+        freqTitle: <>Frequency Domain: <InlineMath math="1" /></>,
+        timeName: "δ(t)",
+        freqName: "1",
+
+        timeSamples: pairTimeAxis.map(() => 0),
+        freqSamples: pairFreqAxis.map(() => 1),
+
+        timeImpulseTraces: makeImpulseTraces(
+            [{ x: 0, height: 1 }],
+            "δ(t)",
+            "rgba(34,197,94,0.95)"
+        ),
+
+        timeYRange: [0, 1.25],
+    },
+        
+        // 1
+        constant: {
+            label: <PairLabel math="1\overset{\mathcal F}{\longleftrightarrow}\delta(f)" />,
+            formula: "1\\overset{\\mathcal F}{\\longleftrightarrow}\\delta(f)",
+            timeTitle: <>Time Domain: <InlineMath math="1" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\delta(f)" /></>,
+            timeName: "1",
+            freqName: "δ(f)",
+            timeSamples: pairTimeAxis.map(() => 1),
+            freqSamples: pairFreqAxis.map(() => 0),
+            freqImpulseTraces: makeImpulseTraces(
+                [{ x: 0, height: 1 }],
+                "δ(f)"
+            ),
+            freqYRange: [0, 1.25],
+        },
+
+        "complex-exp": {
+            label: <PairLabel math="\mathrm{e}^{j2\pi f_0t}\overset{\mathcal F}{\longleftrightarrow}\delta(f-f_0)" />,
+            formula: `\\mathrm{e}^{j2\\pi(${pairWidth.toFixed(2)})t}\\overset{\\mathcal F}{\\longleftrightarrow}\\delta\\left(f-${pairWidth.toFixed(2)}\\right)`,
+            timeTitle: <>Time Domain: <InlineMath math="\cos(2\pi f_0t)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\delta(f-f_0)" /></>,
+            timeName: "cos part of complex exponential",
+            freqName: "δ(f-f₀)",
+            timeSamples: pairTimeAxis.map((t) => Math.cos(2 * Math.PI * pairWidth * t)),
+            freqSamples: pairFreqAxis.map(() => 0),
+            freqImpulseTraces: makeImpulseTraces(
+                [{ x: pairWidth, height: 1 }],
+                "δ(f-f₀)"
+            ),
+            freqYRange: [0, 1.25],
+        },
+
+        cosine: {
+            label: <PairLabel math="\cos(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\left[\delta(f-f_0)+\delta(f+f_0)\right]" />,
+            formula: `\\cos\\left(2\\pi(${pairWidth.toFixed(2)})t\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2}\\left[\\delta\\left(f-${pairWidth.toFixed(2)}\\right)+\\delta\\left(f+${pairWidth.toFixed(2)}\\right)\\right]`,
+            timeTitle: <>Time Domain: <InlineMath math="\cos(2\pi f_0t)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\frac12[\delta(f-f_0)+\delta(f+f_0)]" /></>,
+            timeName: "cos(2πf₀t)",
+            freqName: "cos spectrum",
+            timeSamples: pairTimeAxis.map((t) => Math.cos(2 * Math.PI * pairWidth * t)),
+            freqSamples: pairFreqAxis.map(() => 0),
+            freqImpulseTraces: makeImpulseTraces(
+                [
+                    { x: -pairWidth, height: 0.5 },
+                    { x: pairWidth, height: 0.5 },
+                ],
+                "cos spectrum"
+            ),
+            freqYRange: [0, 0.75],
+        },
+
+        sine: {
+            label: <PairLabel math="\sin(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2j}\left[\delta(f-f_0)-\delta(f+f_0)\right]" />,
+            formula: `\\sin\\left(2\\pi(${pairWidth.toFixed(2)})t\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2j}\\left[\\delta\\left(f-${pairWidth.toFixed(2)}\\right)-\\delta\\left(f+${pairWidth.toFixed(2)}\\right)\\right]`,
+            timeTitle: <>Time Domain: <InlineMath math="\sin(2\pi f_0t)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{2j}[\delta(f-f_0)-\delta(f+f_0)]" /></>,
+            timeName: "sin(2πf₀t)",
+            freqName: "sine spectrum",
+            timeSamples: pairTimeAxis.map((t) => Math.sin(2 * Math.PI * pairWidth * t)),
+            freqSamples: pairFreqAxis.map(() => 0),
+            freqImpulseTraces: makeImpulseTraces(
+                [
+                    { x: -pairWidth, height: 0.5 },
+                    { x: pairWidth, height: 0.5 },
+                ],
+                "sine spectrum"
+            ),
+            freqYRange: [0, 0.75],
+        },
+
+        step: {
+            label: <PairLabel math="u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\delta(f)+\frac{1}{j2\pi f}" />,
+            formula:
+                "u(t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2}\\delta(f)+\\frac{1}{j2\\pi f}",
+            timeTitle: (
+                <>
+                    Time Domain: <InlineMath math="u(t)" />
+                </>
+            ),
+            freqTitle: (
+                <>
+                    Frequency Domain:{" "}
+                    <InlineMath math="\frac{1}{2}\delta(f)+\frac{1}{j2\pi f}" />
+                </>
+            ),
+            timeName: "u(t)",
+            freqName: "step spectrum",
+            timeSamples: pairTimeAxis.map((t) => (t >= 0 ? 1 : 0)),
+            freqSamples: pairFreqAxis.map((f) =>
+                Math.abs(f) < 0.05 ? 1 : 1 / Math.max(Math.abs(2 * Math.PI * f), 0.1)
+            ),
+        },
+
+        "rect-to-sinc": {
+            label: <PairLabel math="\operatorname{rect}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}(Tf)" />,
+            formula: `\\operatorname{rect}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{sinc}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
+            timeTitle: <>Time Domain: <InlineMath math="\operatorname{rect}\left(\frac{t}{T}\right)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{sinc}(Tf)" /></>,
+            timeName: "rect(t/T)",
+            freqName: "T sinc(Tf)",
+            timeSamples: pairTimeAxis.map((t) => rect(t / pairWidth)),
+            freqSamples: pairFreqAxis.map((f) => pairWidth * sinc(pairWidth * f)),
+        },
+
+        triangle: {
+            label: <PairLabel math="\Delta\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}^2(Tf)" />,
+            formula: `\\Delta\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{sinc}^{2}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
+            timeTitle: <>Time Domain: <InlineMath math="\Delta(t/T)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{sinc}^2(Tf)" /></>,
+            timeName: "tri(t/T)",
+            freqName: "T sinc²(Tf)",
+            timeSamples: pairTimeAxis.map((t) => Math.max(1 - Math.abs(t / pairWidth), 0)),
+            freqSamples: pairFreqAxis.map((f) => pairWidth * sinc(pairWidth * f) ** 2),
+        },
+
+        "sinc-to-rect": {
+            label: <PairLabel math="\operatorname{sinc}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{rect}(Tf)" />,
+            formula: `\\operatorname{sinc}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{rect}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
+            timeTitle: <>Time Domain: <InlineMath math="\operatorname{sinc}\left(\frac{t}{T}\right)" /></>,
+            freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{rect}(Tf)" /></>,
+            timeName: "sinc(t/T)",
+            freqName: "T rect(Tf)",
+            timeSamples: pairTimeAxis.map((t) => sinc(t / pairWidth)),
+            freqSamples: pairFreqAxis.map((f) => pairWidth * rect(pairWidth * f)),
+        },
+
+        "impulse-train": {
+            label: (
+                <PairLabel math="\sum_{n=-\infty}^{\infty}\delta(t-nT_0)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{T_0}\sum_{n=-\infty}^{\infty}\delta(f-nf_0)" />
+            ),
+            formula: `\\sum_{n=-\\infty}^{\\infty}\\delta\\left(t-n${pairWidth.toFixed(2)}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}}\\sum_{n=-\\infty}^{\\infty}\\delta\\left(f-n\\frac{1}{${pairWidth.toFixed(2)}}\\right),\\quad f_0=\\frac{1}{T_0}`,
+            timeTitle: (<>Time Domain:{" "}<InlineMath math="\sum_{n=-\infty}^{\infty}\delta(t-nT_0)" /></>),
+            freqTitle: (<>Frequency Domain:{" "}<InlineMath math="\frac{1}{T_0}\sum_{n=-\infty}^{\infty}\delta(f-nf_0)" /></>),
+            timeName: "Impulse train",
+            freqName: "Impulse train spectrum",
+            timeSamples: pairTimeAxis.map(() => 0),
+            freqSamples: pairFreqAxis.map(() => 0),
+            timeImpulseTraces: makeImpulseTraces(
+                Array.from({ length: 13 }, (_, i) => {
+                    const n = i - 6;
+                    return {
+                        x: n * pairWidth,
+                        height: 1,
+                    };
+                }).filter((p) => p.x >= -6 && p.x <= 6),
+                "Impulse train",
+                "rgba(34,197,94,0.95)"
+            ),
+
+            freqImpulseTraces: makeImpulseTraces(
+                Array.from({ length: 17 }, (_, i) => {
+                    const n = i - 8;
+                    const f0 = 1 / pairWidth;
+                    return {
+                        x: n * f0,
+                        height: 1 / pairWidth,
+                    };
+                }).filter((p) => p.x >= -10 && p.x <= 10),
+                "Impulse train spectrum",
+                "rgba(37,99,235,0.95)"
+            ),
+
+            timeYRange: [0, 1.25],
+            freqYRange: [0, Math.max(1.25, 1 / pairWidth + 0.25)],
+        },
+    };
+
+    const selectedPair = transformPairs[pairMode];
+
+    const pairTimeTraces =
+    selectedPair.timeImpulseTraces ??
+    [
         {
             x: pairTimeAxis,
-            y: pairTimeSamples,
+            y: selectedPair.timeSamples,
             type: "scatter",
             mode: "lines",
-            name: pairMode === "rect-to-sinc" ? "rect(t/T)" : "sinc(t/T)",
+            name: selectedPair.timeName,
             line: { color: "rgba(34,197,94,0.95)", width: 3 },
         },
     ];
 
-    const pairFreqTraces = [
+    const pairFreqTraces =
+    selectedPair.freqImpulseTraces ??
+    [
         {
             x: pairFreqAxis,
-            y: pairFreqSamples,
+            y: selectedPair.freqSamples,
             type: "scatter",
             mode: "lines",
-            name: pairMode === "rect-to-sinc" ? "T sinc(Tf)" : "T rect(Tf)",
+            name: selectedPair.freqName,
             line: { color: "rgba(37,99,235,0.95)", width: 3 },
         },
     ];
 
-    const pairTimeTitle =
-        pairMode === "rect-to-sinc" ? (
-            <>
-                Time Domain:&nbsp;
-                <InlineMath
-                    math="\operatorname{rect}\!\left(\frac{t}{T}\right)"
-                />
-            </>
-        ) : (
-            <>
-                Time Domain:&nbsp;
-                <InlineMath
-                    math="\operatorname{sinc}\!\left(\frac{t}{T}\right)"
-                />
-            </>
-        );
+    const pairParameterLabel: Record<PairMode, string> = {
+        "rect-to-sinc": "Width T",
+        "sinc-to-rect": "Width T",
+        triangle: "Width T",
 
-    const pairFreqTitle =
-        pairMode === "rect-to-sinc" ? (
-            <>
-                Frequency Domain:&nbsp;
-                <InlineMath math="T\,\operatorname{sinc}(T⋅f)" />
-            </>
-        ) : (
-            <>
-                Frequency Domain:&nbsp;
-                <InlineMath math="T\,\operatorname{rect}(T⋅f)" />
-            </>
-        );
+        "exp-right": "Decay Constant a",
+        "exp-left": "Decay Constant a",
+        "double-exp": "Decay Constant a",
 
-    const pairFormula =
-        pairMode === "rect-to-sinc" ? (
-                <BlockMath
-                    math={`\\operatorname{rect}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{sinc}\\!\\left(${pairWidth.toFixed(2)}⋅f\\right)`}
-                />
-            ):(
-                <BlockMath
-                    math={`\\operatorname{sinc}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{rect}\\!\\left(${pairWidth.toFixed(2)}⋅f\\right)`}
-                />
-            );
+        cosine: "Frequency f₀",
+        sine: "Frequency f₀",
+        "complex-exp": "Frequency f₀",
+
+        "impulse-train": "Period T₀",
+
+        delta: "Parameter",
+        constant: "Parameter",
+        step: "Parameter",
+    };
+
+    const showParameterSlider: Record<PairMode, boolean> = {
+        "rect-to-sinc": true,
+        "sinc-to-rect": true,
+        triangle: true,
+
+        "exp-right": true,
+        "exp-left": true,
+        "double-exp": true,
+
+        cosine: true,
+        sine: true,
+        "complex-exp": true,
+
+        "impulse-train": true,
+
+        delta: false,
+        constant: false,
+        step: false,
+    };
 
     return (
         <main
@@ -526,7 +828,7 @@ export default function FourierPage() {
                         justifySelf: isMobile ? "start" : "center",
                     }}
                 >
-                    Frequency Domain Explorer
+                    Frequency Domain
                 </h1>
             </div>
 
@@ -556,9 +858,9 @@ export default function FourierPage() {
                     />
 
                     <ButtonToggle
-                        label="Fourier Transform pair of sinc and rect"
-                        active={pageMode === "rect-sinc-pair"}
-                        onClick={() => setPageMode("rect-sinc-pair")}
+                        label="Fourier Transform pair"
+                        active={pageMode === "transform-pair"}
+                        onClick={() => setPageMode("transform-pair")}
                     />
                 </div>
 
@@ -753,6 +1055,10 @@ export default function FourierPage() {
                                     <span style={{ fontSize: "0.80em" }}>
                                         <InlineMath math="\mathcal{F}\{\sin(2\pi f_0t)\}= \frac{j}{2}\left[\delta(f+f_0)-\delta(f-f_0)\right]" />
                                     </span>
+                                    {" , "}
+                                    <span style={{ fontSize: "0.80em" }}>
+                                        <InlineMath math="\mathcal{F}\{\sin(2\pi f_0t+\phi)\}=\frac{1}{2j}\left[e^{j\phi}\delta(f-f_0)-e^{-j\phi}\delta(f+f_0)\right]"/>
+                                    </span>
                                 </div>
 
                                 
@@ -780,12 +1086,8 @@ export default function FourierPage() {
                     </>
                 )}
 
-                {pageMode === "rect-sinc-pair" && (
+                {pageMode === "transform-pair" && (
                     <>
-                        {/* <div style={{ fontWeight: 850, marginBottom: 8 }}>
-                           <InlineMath math="Sinc\;Formula:\;\operatorname{sinc}(t)=\frac{\sin(\pi t)}{\pi t}" />
-                        </div> */}
-
                         <div
                             style={{
                                 display: "flex",
@@ -794,57 +1096,54 @@ export default function FourierPage() {
                                 marginBottom: gapBottom,
                             }}
                         >
-                            <ButtonToggle
-                            label={
-                                <div
-                                    style={{
-                                        fontSize: "14px",
-                                        transform: "scale(1)",
-                                        transformOrigin: "center",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                    >
-                                    <InlineMath
-                                        math="\operatorname{rect}\!\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\,\operatorname{sinc}(T⋅f)"
-                                    />
-                                </div>
-                            }
-                            active={pairMode === "rect-to-sinc"}
-                            onClick={() => setPairMode("rect-to-sinc")}
-                            />
+                            <div
+                                style={{
+                                    marginTop: 12,
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    border: "1px solid rgba(255,255,255,0.15)",
+                                    background: "rgba(255,255,255,0.03)",
 
-                            <ButtonToggle
-                                label={
-                                    <div
-                                        style={{
-                                            fontSize: "14px",
-                                            transform: "scale(1)",
-                                            transformOrigin: "center",
-                                            whiteSpace: "nowrap",
-                                            
-                                        }}
-                                        >
-                                        <InlineMath
-                                            math="\operatorname{sinc}\!\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\,\operatorname{rect}(T⋅f)"
-                                        />
-                                    </div>
-                                }
-                                active={pairMode === "sinc-to-rect"}
-                                onClick={() => setPairMode("sinc-to-rect")}
-                            />
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 8,          // spacing between buttons
+                                }}
+                            >
+                                {(Object.keys(transformPairs) as PairMode[]).map((mode) => (
+                                    <ButtonToggle
+                                        key={mode}
+                                        label={transformPairs[mode].label}
+                                        active={pairMode === mode}
+                                        onClick={() => setPairMode(mode)}
+                                    />
+                                ))}
+                            </div>
                             
                         </div>
                         
-                        <ParameterSlider
-                            label={`Width T = ${pairWidth.toFixed(2)}`}
-                            value={pairWidth}
-                            setValue={setPairWidth}
-                            text={pairWidthText}
-                            setText={setPairWidthText}
-                            minRange={0.2}
-                            maxRange={10}
-                            stepRange={0.01}
-                        />
+                        {showParameterSlider[pairMode] ? (
+                            <ParameterSlider
+                                label={`${pairParameterLabel[pairMode]} = ${pairWidth.toFixed(2)}`}
+                                value={pairWidth}
+                                setValue={setPairWidth}
+                                text={pairWidthText}
+                                setText={setPairWidthText}
+                                minRange={0.2}
+                                maxRange={10}
+                                stepRange={0.01}
+                            />
+                        ) : (
+                            <div
+                                style={{
+                                    fontStyle: "italic",
+                                    opacity: 0.75,
+                                    marginBottom: gapBottom,
+                                    padding: "8px 0",
+                                }}
+                            >
+                                This Fourier transform pair has no adjustable parameter.
+                            </div>
+                        )}
 
                         <div
                             style={{
@@ -863,9 +1162,9 @@ export default function FourierPage() {
                             </div>
                             
 
-                            <div>{pairFormula}</div>
+                            <BlockMath math={selectedPair.formula} />
 
-                            <div
+                            {/* <div
                                 style={{
                                     marginTop: 12,
                                     padding: "10px 12px",
@@ -893,7 +1192,7 @@ export default function FourierPage() {
                                     Increasing the width in one domain makes the corresponding Fourier transform
                                     narrower in the other domain.
                                 </div>
-                            </div>
+                            </div> */}
                         </div>
                     </>
                 )}
@@ -969,7 +1268,7 @@ export default function FourierPage() {
                 </div>
             )}
 
-            {pageMode === "rect-sinc-pair" && (
+            {pageMode === "transform-pair" && (
                 <div
                     style={{
                         display: "grid",
@@ -979,21 +1278,23 @@ export default function FourierPage() {
                     }}
                 >
                     <SignalPlot
-                        title={pairTimeTitle}
+                        title={selectedPair.timeTitle}
                         height={isMobile ? 340 : 420}
                         traces={pairTimeTraces}
                         xLabel="t"
                         yLabel="Amplitude"
                         xRange={[-6, 6]}
+                        yRange={selectedPair.timeYRange}
                     />
 
                     <SignalPlot
-                        title={pairFreqTitle}
+                        title={selectedPair.freqTitle}
                         height={isMobile ? 340 : 420}
                         traces={pairFreqTraces}
                         xLabel="f"
                         yLabel="Magnitude"
-                        xRange={[-4, 4]}
+                        xRange={[-10, 10]}
+                        yRange={selectedPair.freqYRange}
                     />
                 </div>
             )}

@@ -691,7 +691,7 @@ export default function ConvolutionPage() {
         </div>
         {/* Title */}
         <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 750, margin: 0, justifySelf: "center",}}>
-            Convolution Canvas (Interactive)
+            Convolution
         </h1>
     </div>
     {/* End of header */}
