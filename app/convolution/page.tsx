@@ -14,9 +14,8 @@ import {buildExpressionEvaluator,validateExpression} from "@/library/customExpre
 import DrawSignalControls from "@/components/DrawSignalControls";
 import DrawSignalPanel from "@/components/DrawSignalPanel";
 import { InlineMath } from "react-katex";
-import { getPresetValue } from "@/library/signalEvaluator";
+import { getPresetValue, getDrawnValue } from "@/library/signalEvaluator";
 import { createDefaultSignalState ,type SignalSource,} from "@/library/types";
-
 
 
 export const gapBottom = 7
@@ -258,17 +257,6 @@ export default function ConvolutionPage() {
         setXDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
         setHDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
     }, [tau]);
-
-    function getDrawnValue(inputX: number, axis: number[], drawn: number[]) {
-        if (axis.length === 0 || drawn.length === 0) return 0;
-        if (axis.length === 1) return drawn[0] ?? 0;
-
-        const step = axis[1] - axis[0];
-        const idx = Math.round((inputX - axis[0]) / step);
-        const clampedIdx = Math.max(0, Math.min(axis.length - 1, idx));
-
-        return drawn[clampedIdx] ?? 0;
-    }
 
     function evaluateXSignal(inputX: number): number {
         if (xSource === "preset") {
@@ -642,7 +630,7 @@ export default function ConvolutionPage() {
         fontSize: isMobile ? "0.9rem" : "1rem"
         }}
     >
-
+        
     {/* Header; 3 column; 1fr at back to center title */}
     <div ref={headerRef} style={{ display: "grid", gridTemplateColumns: isMobile ? "auto 1fr" : "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
         {/* Back Link */}
