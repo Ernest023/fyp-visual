@@ -1,10 +1,9 @@
 "use client";
 
 import { PresetInput } from "@/library/signal";
-import { borderColor, backgroundColor } from "@/app/convolution/page";
+import { theme } from "@/styles/theme";
 import { InlineMath } from "react-katex";
-
-export type SourceMode = "preset" | "expression" | "draw";
+import type { SignalSource } from "@/library/types";
 
 type PresetOption = {
     id: PresetInput;
@@ -26,8 +25,8 @@ type SignalSourcePresetProps = {
 type SignalSourceSelectionProps = {
     signalName: string;
     varLetter: string;
-    source: SourceMode;
-    setSource: React.Dispatch<React.SetStateAction<SourceMode>>;
+    source: SignalSource;
+    setSource: React.Dispatch<React.SetStateAction<SignalSource>>;
     gapBottom: number;
     isHSignal: boolean;
     isHFlipped: boolean;
@@ -63,17 +62,20 @@ type TSlidersProps = {
 export function ButtonToggle({ label, active, onClick }: { label: React.ReactNode; active: boolean; onClick: () => void;}) {
   return (
     <button
+        type="button"
         onClick={onClick}
+        aria-pressed={active}
         style={{
-            height: 30,
-            padding: "2px 10px 30px 10px",
+            height: 32,
+            padding: "0 12px",
             borderRadius: 10,
-            border: borderColor,
-            background: active ? "rgba(255, 255, 255, 0.25)" : "transparent",
+            border: active ? theme.borders.active : theme.borders.standard,
+            background: active ? "rgba(255,255,255,0.25)" : "transparent",
             color: "white",
             fontWeight: 800,
             cursor: "pointer",
             whiteSpace: "nowrap",
+            boxShadow: active ? "0 0 0 2px rgba(255,255,255,0.10)" : "none",
             }}>
       {label}
     </button>
@@ -106,7 +108,7 @@ export function TextBoxSliders({
                     type="text"
                     inputMode={isDiscrete && roundOnDiscrete ? "numeric" : "decimal"}
                     style={{
-                        border:borderColor, 
+                        border: theme.borders.standard, 
                         height: 22, 
                         width: 72, 
                         borderRadius: 6,
@@ -115,7 +117,7 @@ export function TextBoxSliders({
                         fontFamily: "monospace",
                         padding: "0 6px",
                         color: "white",
-                        background: backgroundColor
+                        background: theme.colors.background,
                     }}
                     value={widthText}
                     onChange={(e) => {
@@ -297,7 +299,7 @@ export default function SignalSourcePreset({
                     <select 
                     value={selectedPreset} 
                     onChange={(e) => setSelectedPreset(e.target.value as PresetInput)} 
-                    style={{ width: "100%", height: 34, borderRadius: 10, background: "black", color: "white", border: borderColor, marginBottom: gapBottom}} >
+                    style={{ width: "100%", height: 34, borderRadius: 10, background: "black", color: "white", border: theme.borders.standard, marginBottom: gapBottom}} >
                     {presets.map((p) => (
                         <option key={p.id} value={p.id}>
                             {p.id}
@@ -385,7 +387,7 @@ export function ParameterSlider({
             }
           }}
           style={{
-            border: "1px solid rgba(255,255,255,0.35)",
+            border: theme.borders.standard,
             height: 22,
             width: 72,
             borderRadius: 6,
@@ -394,7 +396,7 @@ export function ParameterSlider({
             fontFamily: "monospace",
             padding: "0 6px",
             color: "white",
-            background: "black",
+            background: theme.colors.background,
           }}
         />
 

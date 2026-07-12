@@ -7,19 +7,25 @@ import Link from "next/link";
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
-import SignalSourcePreset, {SourceMode, ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
+import SignalSourcePreset, {ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
 import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
 import CustomExpressionInput from "@/components/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
 import DrawSignalControls from "@/components/DrawSignalControls";
 import DrawSignalPanel from "@/components/DrawSignalPanel";
 import { InlineMath } from "react-katex";
+import { getPresetValue } from "@/library/signalEvaluator";
+import { createDefaultSignalState ,type SignalSource,} from "@/library/types";
+
 
 
 export const gapBottom = 7
 
 export const borderColor = "1px solid rgba(255,255,255,0.35)"
 export const backgroundColor = "rgb(0, 0, 0)"
+
+const defaultXSignal = createDefaultSignalState("rect");
+const defaultHSignal = createDefaultSignalState("tri");
 
 export default function ConvolutionPage() {
     type TimeMode = "continuous" | "discrete";
@@ -51,24 +57,24 @@ export default function ConvolutionPage() {
     const varLetter = isDiscrete ? "[n]" : "(t)";
 
     // ===== x source + h source ===== sources is default at preset
-    const [xSource, setXSource] = useState<SourceMode>("preset");
-    const [hSource, setHSource] = useState<SourceMode>("preset");
+    const [xSource, setXSource] = useState<SignalSource>(defaultXSignal.source);
+    const [hSource, setHSource] = useState<SignalSource>(defaultHSignal.source);
 
     // ===== presets =====
-    const [xInput, setXInput] = useState<PresetInput>("rect");
-    const [hInput, setHInput] = useState<PresetInput>("tri");
+    const [xInput, setXInput] = useState<PresetInput>(defaultXSignal.preset);
+    const [hInput, setHInput] = useState<PresetInput>(defaultHSignal.preset);
 
     // ===== widths (For preset only) =====
-    const [xWidth, setxWidth] = useState<number>(1);
-    const [hWidth, sethWidth] = useState<number>(1);
+    const [xWidth, setXWidth] = useState<number>(defaultXSignal.width);
+    const [hWidth, setHWidth] = useState<number>(defaultHSignal.width);
 
     // ===== amplitude (For preset only) =====
-    const [xAmp, setxAmp] = useState<number>(1);
-    const [hAmp, sethAmp] = useState<number>(1);
+    const [xAmp, setXAmp] = useState<number>(defaultXSignal.amplitude);
+    const [hAmp, setHAmp] = useState<number>(defaultHSignal.amplitude);
 
     // ===== width range ====
     const WidthMinC = 0.2, WidthMaxC = 3, WidthStepC = 0.01;
-    const WidthMinD = 0, WidthMaxD = 20, WidthStepD = 1;
+    const WidthMinD = 1, WidthMaxD = 20, WidthStepD = 1;
 
     // ===== set width range according to mode =====
     const WidthMin = isDiscrete ? WidthMinD : WidthMinC;
@@ -79,30 +85,22 @@ export default function ConvolutionPage() {
     const AmpMin = -10, AmpMax = 10, AmpStep = 0.01;
 
     // ===== Text box =====
-    const [xWidthText, setxWidthText] = useState<string>(isDiscrete ? String(Math.round(xWidth)) : xWidth.toFixed(2));
-    const [hWidthText, sethWidthText] = useState<string>(isDiscrete ? String(Math.round(hWidth)) : hWidth.toFixed(2));
-    const [xAmpText, setxAmpText] = useState<string>(xAmp.toFixed(2))
-    const [hAmpText, sethAmpText] = useState<string>(hAmp.toFixed(2))
+    const [xWidthText, setXWidthText] = useState<string>(isDiscrete ? String(Math.round(xWidth)) : xWidth.toFixed(2));
+    const [hWidthText, setHWidthText] = useState<string>(isDiscrete ? String(Math.round(hWidth)) : hWidth.toFixed(2));
+    const [xAmpText, setXAmpText] = useState<string>(xAmp.toFixed(2))
+    const [hAmpText, setHAmpText] = useState<string>(hAmp.toFixed(2))
 
     // ==== x and h input expression state ====
-    const [xExpr, setXExpr] = useState("");
-    const [hExpr, setHExpr] = useState("");
-
-    // ==== error message for expression state ====
-    const [xExprError, setXExprError] = useState("");
-    const [hExprError, setHExprError] = useState("");
-
+    const [xExpr, setXExpr] = useState(defaultXSignal.expression);
+    const [hExpr, setHExpr] = useState(defaultHSignal.expression);
     
     const xExprCheck = useMemo(() => {
         if (xSource !== "expression") return { ok: true, error: "" };
         //trim() removes spaces at start and end
         if (xExpr.trim() === "") return { ok: true, error: "" };
         return validateExpression(xExpr, isDiscrete)
-    }, [xExpr, xSource]);
+    }, [xExpr, xSource, isDiscrete]);
 
-    useEffect(() => {
-        setXExprError(xExprCheck.error);
-    }, [xExprCheck]);
     // If x is using custom expression mode, validate the typed text, and if valid, build a function for it.
     const xExprFn = useMemo(() => {
         if (xSource !== "expression") return null;
@@ -116,11 +114,8 @@ export default function ConvolutionPage() {
         if (hSource !== "expression") return { ok: true, error: "" };
         if (hExpr.trim() === "") return { ok: true, error: "" };
         return validateExpression(hExpr, isDiscrete);
-    }, [hExpr, hSource]);
+    }, [hExpr, hSource, isDiscrete]);
 
-    useEffect(() => {
-        setHExprError(hExprCheck.error);
-    }, [hExprCheck]);
     // If h is using custom expression mode, validate the typed text, and if valid, build a function for it.
     const hExprFn = useMemo(() => {
         if (hSource !== "expression") return null;
@@ -135,14 +130,14 @@ export default function ConvolutionPage() {
         const newXWidth = Math.round(xWidth);
         const newHWidth = Math.round(hWidth);
 
-        setxWidth(newXWidth);
-        sethWidth(newHWidth);
+        setXWidth(newXWidth);
+        setHWidth(newHWidth);
 
-        setxWidthText(String(newXWidth));
-        sethWidthText(String(newHWidth));
+        setXWidthText(String(newXWidth));
+        setHWidthText(String(newHWidth));
     } else {
-        setxWidthText(xWidth.toFixed(2));
-        sethWidthText(hWidth.toFixed(2));
+        setXWidthText(xWidth.toFixed(2));
+        setHWidthText(hWidth.toFixed(2));
     }}, [isDiscrete]);
 
     // ==== screen height ====
@@ -185,27 +180,6 @@ export default function ConvolutionPage() {
     const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
     const availableHeight = Math.max(240, remainingHeight); //use highest value
     const signalPlotHeight = isMobile ? 360 : Math.floor((availableHeight - gapBottom) / 2);
-
-    // evaluate the chosen preset signal at that x-value
-    function getPresetValue(
-        presetId: PresetInput,
-        inputX: number,
-        width: number,
-        amplitude: number
-    ): number {
-        // DT sine uses different formula due to signal lib setup
-        if (presetId === "sine") {
-            if (isDiscrete) {
-                return amplitude * Math.sin((Math.PI / 4) * inputX);
-            }
-            return amplitude * Math.sin(2 * Math.PI * (inputX / width));
-        }
-        const preset = PRESETS.find((p) => p.id === presetId);
-        if (!preset) return 0;
-
-        // width scales horizontally, amplitude scales vertically
-        return amplitude * preset.fn(inputX / width);
-    }
 
     // samplePointmultiplier
     const spm = 1
@@ -298,7 +272,7 @@ export default function ConvolutionPage() {
 
     function evaluateXSignal(inputX: number): number {
         if (xSource === "preset") {
-            return getPresetValue(xInput, inputX, xWidth, xAmp);
+            return getPresetValue(xInput, inputX, xWidth, xAmp, isDiscrete);
         }
 
         if (xSource === "expression" && xExprFn) {
@@ -313,7 +287,7 @@ export default function ConvolutionPage() {
 
     function evaluateHSignal(inputX: number): number {
         if (hSource === "preset") {
-            return getPresetValue(hInput, inputX, hWidth, hAmp);
+            return getPresetValue(hInput, inputX, hWidth, hAmp, isDiscrete);
         }
         if (hSource === "expression" && hExprFn) {
             if (hExpr.trim() === "" || !hExprFn) return 0;
@@ -610,34 +584,32 @@ export default function ConvolutionPage() {
     // setting to default state whenever source is changed
     useEffect(() => {
         if (xSource === "preset") {
-            setxWidth(1);
-            setxAmp(1);
+            setXWidth(1);
+            setXAmp(1);
             setXInput("rect");
-            setxWidthText(isDiscrete ? "1" : "1.00");
-            setxAmpText("1.00");
+            setXWidthText(isDiscrete ? "1" : "1.00");
+            setXAmpText("1.00");
             setT0(isDiscrete ? -2 : -2.5);
         }
 
         if (xSource === "expression") {
             setXExpr("");
-            setXExprError("");
             setT0(isDiscrete ? -15 : -15);
         }
     }, [xSource, isDiscrete]);
 
     useEffect(() => {
         if (hSource === "preset") {
-            sethWidth(1);
-            sethAmp(1);
+            setHWidth(1);
+            setHAmp(1);
             setHInput("tri");
-            sethWidthText(isDiscrete ? "1" : "1.00");
-            sethAmpText("1.00");
+            setHWidthText(isDiscrete ? "1" : "1.00");
+            setHAmpText("1.00");
             setT0(isDiscrete ? -2 : -2.5);
         }
 
         if (hSource === "expression") {
             setHExpr("");
-            setHExprError("");
             setT0(isDiscrete ? -15 : -15);
         }
     }, [hSource, isDiscrete]);
@@ -753,9 +725,9 @@ export default function ConvolutionPage() {
                             maxRange = {WidthMax}
                             stepRange = {WidthStep}
                             widthValue = {xWidth}
-                            setWidthValue = {setxWidth}
+                            setWidthValue = {setXWidth}
                             widthText={xWidthText}
-                            setWidthText={setxWidthText}
+                            setWidthText={setXWidthText}
                             signalLabel={xDisplayLabel}
                         />
                         {/* x amp sliders */}
@@ -769,9 +741,9 @@ export default function ConvolutionPage() {
                             maxRange = {AmpMax}
                             stepRange = {AmpStep}
                             widthValue = {xAmp}
-                            setWidthValue = {setxAmp}
+                            setWidthValue = {setXAmp}
                             widthText={xAmpText}
-                            setWidthText={setxAmpText}
+                            setWidthText={setXAmpText}
                             signalLabel={xDisplayLabel}
                         />
                     </>
@@ -781,7 +753,7 @@ export default function ConvolutionPage() {
                         title="Custom Expression for x"
                         value={xExpr}
                         setValue={setXExpr}
-                        error={xExprError}
+                        error={xExprCheck.error}
                         gapBottom={gapBottom}
                         placeholder={isDiscrete ? "Example: rect[n/3] + sin[PI*n/4]" : "Example: rect(t/2) + sin(2*PI*t)"}
                         parsedOk={xExprCheck.ok}
@@ -846,9 +818,9 @@ export default function ConvolutionPage() {
                         maxRange = {WidthMax}
                         stepRange = {WidthStep}
                         widthValue = {hWidth}
-                        setWidthValue = {sethWidth}
+                        setWidthValue = {setHWidth}
                         widthText={hWidthText}
-                        setWidthText={sethWidthText}
+                        setWidthText={setHWidthText}
                         signalLabel={hDisplayLabel}
                     />
                     {/* h Amp sliders */}
@@ -862,9 +834,9 @@ export default function ConvolutionPage() {
                         maxRange = {AmpMax}
                         stepRange = {AmpStep}
                         widthValue = {hAmp}
-                        setWidthValue = {sethAmp}
+                        setWidthValue = {setHAmp}
                         widthText={hAmpText}
-                        setWidthText={sethAmpText}
+                        setWidthText={setHAmpText}
                         signalLabel={hDisplayLabel}
                     />
                 </>)}
@@ -873,7 +845,7 @@ export default function ConvolutionPage() {
                         title="Custom Expression for h"
                         value={hExpr}
                         setValue={setHExpr}
-                        error={hExprError}
+                        error={hExprCheck.error}
                         gapBottom={gapBottom}
                         placeholder={isDiscrete ? "Example: tri[n/2]" : "Example: exp(-2*t)*u(t)"}
                         parsedOk={hExprCheck.ok}
@@ -973,32 +945,32 @@ export default function ConvolutionPage() {
     {/* show Drawing panel */}
     {xSource === "draw" && showDrawModalX && (
         <DrawSignalPanel
-            open={xSource === "draw" && showDrawModalX}
+            open={showDrawModalX}
             onClose={() => setShowDrawModalX(false)}
             title={`Draw ${xDisplayLabel}`}
             tau={tau}
             samples={xDrawn}
             onChange={setXDrawn}
             onClear={() => setXDrawn(Array(tau.length).fill(0))}
-            yMin={-Ax}
-            yMax={Ax}
+            yMin={-Math.max(Math.abs(Ax), 0.1)}
+            yMax={Math.max(Math.abs(Ax), 0.1)}
             canvasHeight={drawCanvasH}
             modalHeight={modalH}
             discrete={isDiscrete}
         />
     )}
 
-    {xSource === "draw" && showDrawModalH && (
+    {hSource === "draw" && showDrawModalH && (
         <DrawSignalPanel
-            open={hSource === "draw" && showDrawModalH}
+            open={showDrawModalH}
             onClose={() => setShowDrawModalH(false)}
             title={`Draw ${hDisplayLabel}`}
             tau={tau}
             samples={hDrawn}
             onChange={setHDrawn}
             onClear={() => setHDrawn(Array(tau.length).fill(0))}
-            yMin={-Ah}
-            yMax={Ah}
+            yMin={-Math.max(Math.abs(Ah), 0.1)}
+            yMax={Math.max(Math.abs(Ah), 0.1)}
             canvasHeight={drawCanvasH}
             modalHeight={modalH}
             discrete={isDiscrete}

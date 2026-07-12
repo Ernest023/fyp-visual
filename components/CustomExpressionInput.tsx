@@ -1,6 +1,6 @@
 "use client";
 
-import { borderColor, backgroundColor } from "@/app/convolution/page";
+import { theme } from "@/styles/theme";
 import { InlineMath } from "react-katex";
 
 export type QuickSnippet = {
@@ -72,8 +72,8 @@ export default function CustomExpressionInput({
             width: "100%",
             height: 34,
             borderRadius: 8,
-            border: borderColor,
-            background: backgroundColor,
+            border: theme.borders.standard,
+            background: theme.colors.background,
             color: "white",
             padding: "0 8px",
             outline: "none",

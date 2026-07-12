@@ -2,7 +2,8 @@
 
 import React from "react";
 import { ButtonToggle, TextBoxSliders  } from "./ControlPanelSource";
-import { gapBottom } from "@/app/convolution/page";
+import { theme } from "@/styles/theme";
+
 
 type DrawSignalControlsProps = {
   signalName: string;
@@ -37,7 +38,7 @@ export default function DrawSignalControls({
 }: DrawSignalControlsProps) {
     return (
     <>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: gapBottom }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: theme.spacing.controlGap }}>
             <ButtonToggle label="Open drawing pad" active={false} onClick={onOpen}/>
             <ButtonToggle label="Clear" active={false} onClick={onClear}/>
         </div>

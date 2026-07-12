@@ -4,8 +4,9 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import SignalPlot, { makeStemTraces } from "@/components/SignalPlot";
 import { ButtonToggle, ParameterSlider } from "@/components/ControlPanelSource";
-import { borderColor, backgroundColor, gapBottom } from "@/app/convolution/page";
+import { theme } from "@/styles/theme";
 import { InlineMath, BlockMath } from "react-katex";
+
 
 
 type PageMode = "sine-builder" | "transform-pair";
@@ -792,7 +793,7 @@ export default function FourierPage() {
                 boxSizing: "border-box",
                 overflow: "auto",
                 color: "#ffffff",
-                background: backgroundColor,
+                background: theme.colors.background,
             }}
         >
             <div
@@ -801,7 +802,7 @@ export default function FourierPage() {
                     gridTemplateColumns: isMobile ? "auto 1fr" : "1fr auto 1fr",
                     alignItems: "center",
                     gap: 8,
-                    marginBottom: gapBottom,
+                    marginBottom: theme.spacing.controlGap,
                 }}
             >
                 <div>
@@ -809,7 +810,7 @@ export default function FourierPage() {
                         href="/"
                         style={{
                             display: "inline-block",
-                            border: borderColor,
+                            border: theme.borders.standard,
                             borderRadius: 10,
                             padding: "5px 10px",
                             fontWeight: 650,
@@ -834,11 +835,11 @@ export default function FourierPage() {
 
             <div
                 style={{
-                    border: borderColor,
+                    border: theme.borders.standard,
                     borderRadius: 12,
                     padding: 10,
                     boxSizing: "border-box",
-                    marginBottom: gapBottom,
+                    marginBottom: theme.spacing.controlGap,
                     background: "rgba(0,0,0,0.12)",
                 }}
             >
@@ -848,7 +849,7 @@ export default function FourierPage() {
                         gap: 8,
                         flexWrap: "wrap",
                         alignItems: "center",
-                        marginBottom: gapBottom,
+                        marginBottom: theme.spacing.controlGap,
                     }}
                 >
                     <ButtonToggle
@@ -920,7 +921,7 @@ export default function FourierPage() {
                                             <button
                                                 onClick={() => removeComponent(c.id)}
                                                 style={{
-                                                    border: borderColor,
+                                                    border: theme.borders.standard,
                                                     borderRadius: 8,
                                                     background: "transparent",
                                                     color: "white",
@@ -997,7 +998,7 @@ export default function FourierPage() {
                                 height: 32,
                                 padding: "0 12px",
                                 borderRadius: 10,
-                                border: borderColor,
+                                border: theme.borders.standard,
                                 background:
                                     components.length >= MAX_SINES
                                         ? "rgba(255,255,255,0.08)"
@@ -1093,7 +1094,7 @@ export default function FourierPage() {
                                 display: "flex",
                                 gap: 8,
                                 flexWrap: "wrap",
-                                marginBottom: gapBottom,
+                                marginBottom: theme.spacing.controlGap,
                             }}
                         >
                             <div
@@ -1137,7 +1138,7 @@ export default function FourierPage() {
                                 style={{
                                     fontStyle: "italic",
                                     opacity: 0.75,
-                                    marginBottom: gapBottom,
+                                    marginBottom: theme.spacing.controlGap,
                                     padding: "8px 0",
                                 }}
                             >
@@ -1203,12 +1204,12 @@ export default function FourierPage() {
                     style={{
                         display: "grid",
                         gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: gapBottom,
+                        gap: theme.spacing.controlGap,
                         alignItems: "start",
                     }}
                 >
                     <div>
-                        <div style={{ marginBottom: gapBottom }}>
+                        <div style={{ marginBottom: theme.spacing.controlGap }}>
                             <SignalPlot
                                 title="Individual Sine Components"
                                 height={plotHeight}
@@ -1232,7 +1233,7 @@ export default function FourierPage() {
                     </div>
 
                     <div>
-                        <div style={{ marginBottom: gapBottom }}>
+                        <div style={{ marginBottom: theme.spacing.controlGap }}>
                             <SignalPlot
                                 title={
                                     <>
@@ -1273,7 +1274,7 @@ export default function FourierPage() {
                     style={{
                         display: "grid",
                         gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                        gap: gapBottom,
+                        gap: theme.spacing.controlGap,
                         alignItems: "start",
                     }}
                 >
