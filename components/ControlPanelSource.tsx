@@ -28,9 +28,6 @@ type SignalSourceSelectionProps = {
     source: SignalSource;
     setSource: React.Dispatch<React.SetStateAction<SignalSource>>;
     gapBottom: number;
-    isHSignal: boolean;
-    isHFlipped: boolean;
-    setIsHFlipped: React.Dispatch<React.SetStateAction<boolean>> | (() => void);
 };
 
 type TextBoxSlidersProps = {
@@ -211,9 +208,6 @@ export function SignalSourceSelection({
     source,
     setSource,
     gapBottom,
-    isHSignal,
-    isHFlipped,
-    setIsHFlipped,
     }: 
     SignalSourceSelectionProps) {
     return (
@@ -225,12 +219,6 @@ export function SignalSourceSelection({
             <ButtonToggle label="Preset" active={source === "preset"} onClick={() => setSource("preset")}/>
             <ButtonToggle label="Custom Expression" active={source === "expression"} onClick={() => setSource("expression")}/>
             <ButtonToggle label="Draw" active={source === "draw"} onClick={() => setSource("draw")}/>
-            {isHSignal && (
-                <>
-                    <span>Flip h for convolution:</span>
-                    <ButtonToggle label="Flip" active={isHFlipped} onClick={() => setIsHFlipped((prev: boolean) => !prev)}/>
-                </>
-            )}
         </div>
     );  
 }

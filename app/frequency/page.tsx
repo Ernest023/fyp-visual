@@ -7,8 +7,6 @@ import { ButtonToggle, ParameterSlider } from "@/components/ControlPanelSource";
 import { theme } from "@/styles/theme";
 import { InlineMath, BlockMath } from "react-katex";
 
-
-
 type PageMode = "sine-builder" | "transform-pair";
 
 type PairMode =
@@ -111,7 +109,10 @@ function rect(x: number) {
 }
 
 export default function FourierPage() {
-    const [isMobile, setIsMobile] = useState(false);
+    const [viewportWidth, setViewportWidth] = useState(1280);
+    const isMobile = viewportWidth < 600;
+    const isTablet = viewportWidth >= 600 && viewportWidth < 1024;
+    const useSingleColumnPlots = viewportWidth < 1024;
 
     const [pageMode, setPageMode] = useState<PageMode>("sine-builder");
     const [pairMode, setPairMode] = useState<PairMode>("exp-right");
@@ -134,7 +135,7 @@ export default function FourierPage() {
     });
 
     useEffect(() => {
-        const update = () => setIsMobile(window.innerWidth < 768);
+        const update = () => setViewportWidth(window.innerWidth);
 
         update();
         window.addEventListener("resize", update);
@@ -465,7 +466,7 @@ export default function FourierPage() {
         </div>
     );
 
-    const plotHeight = isMobile ? 320 : 250;
+    const plotHeight = isMobile ? 315 : isTablet ? 350 : 270;
 
     const maxFreq = Math.max(...components.map((c) => c.frequency), 1);
     const freqRange: [number, number] = [-maxFreq - 1, maxFreq + 1];
@@ -486,6 +487,8 @@ export default function FourierPage() {
                     transform: "scale(0.99)",
                     transformOrigin: "center",
                     whiteSpace: "nowrap",
+                    maxWidth: isMobile ? "calc(100vw - 72px)" : undefined,
+                    overflowX: isMobile ? "auto" : undefined,
                 }}
             >
                 <InlineMath math={math} />
@@ -789,7 +792,7 @@ export default function FourierPage() {
         <main
             style={{
                 minHeight: "100vh",
-                padding: isMobile ? "8px 8px 28px 8px" : "10px 12px 40px 12px",
+                padding: isMobile ? "8px 6px 28px" : "10px 12px 40px",
                 boxSizing: "border-box",
                 overflow: "auto",
                 color: "#ffffff",
@@ -823,7 +826,7 @@ export default function FourierPage() {
 
                 <h1
                     style={{
-                        fontSize: isMobile ? 18 : 22,
+                        fontSize: isMobile ? 17 : isTablet ? 20 : 22,
                         fontWeight: 750,
                         margin: 0,
                         justifySelf: isMobile ? "start" : "center",
@@ -837,7 +840,7 @@ export default function FourierPage() {
                 style={{
                     border: theme.borders.standard,
                     borderRadius: 12,
-                    padding: 10,
+                    padding: isMobile ? 8 : 10,
                     boxSizing: "border-box",
                     marginBottom: theme.spacing.controlGap,
                     background: "rgba(0,0,0,0.12)",
@@ -874,7 +877,11 @@ export default function FourierPage() {
                         <div
                             style={{
                                 display: "grid",
-                                gridTemplateColumns: isMobile ? "1fr" : "repeat(8, 1fr)",
+                                gridTemplateColumns: isMobile
+                                    ? "1fr"
+                                    : isTablet
+                                      ? "repeat(2, minmax(0, 1fr))"
+                                      : "repeat(4, minmax(0, 1fr))",
                                 gap: 10,
                             }}
                         >
@@ -1203,7 +1210,7 @@ export default function FourierPage() {
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gridTemplateColumns: useSingleColumnPlots ? "1fr" : "1fr 1fr",
                         gap: theme.spacing.controlGap,
                         alignItems: "start",
                     }}
@@ -1217,6 +1224,8 @@ export default function FourierPage() {
                                 xLabel="t"
                                 yLabel="Amplitude"
                                 xRange={[tAxis[0], tAxis[tAxis.length - 1]]}
+                                compact={isMobile}
+                                compactM={isTablet}
                             />
                         </div>
 
@@ -1228,6 +1237,8 @@ export default function FourierPage() {
                                 xLabel="t"
                                 yLabel="Amplitude"
                                 xRange={[tAxis[0], tAxis[tAxis.length - 1]]}
+                                compact={isMobile}
+                                compactM={isTablet}
                             />
                         </div>
                     </div>
@@ -1246,6 +1257,8 @@ export default function FourierPage() {
                                 xLabel="Frequency / Hz"
                                 yLabel="Magnitude"
                                 xRange={freqRange}
+                                compact={isMobile}
+                                compactM={isTablet}
                             />
                         </div>
 
@@ -1263,6 +1276,8 @@ export default function FourierPage() {
                                 yLabel="Phase / rad"
                                 yRange={[-Math.PI, Math.PI]}
                                 xRange={freqRange}
+                                compact={isMobile}
+                                compactM={isTablet}
                             />
                         </div>
                     </div>
@@ -1273,29 +1288,33 @@ export default function FourierPage() {
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gridTemplateColumns: useSingleColumnPlots ? "1fr" : "1fr 1fr",
                         gap: theme.spacing.controlGap,
                         alignItems: "start",
                     }}
                 >
                     <SignalPlot
                         title={selectedPair.timeTitle}
-                        height={isMobile ? 340 : 420}
+                        height={isMobile ? 330 : isTablet ? 370 : 420}
                         traces={pairTimeTraces}
                         xLabel="t"
                         yLabel="Amplitude"
                         xRange={[-6, 6]}
                         yRange={selectedPair.timeYRange}
+                        compact={isMobile}
+                        compactM={isTablet}
                     />
 
                     <SignalPlot
                         title={selectedPair.freqTitle}
-                        height={isMobile ? 340 : 420}
+                        height={isMobile ? 330 : isTablet ? 370 : 420}
                         traces={pairFreqTraces}
                         xLabel="f"
                         yLabel="Magnitude"
                         xRange={[-10, 10]}
                         yRange={selectedPair.freqYRange}
+                        compact={isMobile}
+                        compactM={isTablet}
                     />
                 </div>
             )}

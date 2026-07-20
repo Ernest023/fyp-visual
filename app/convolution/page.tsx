@@ -33,19 +33,15 @@ export default function ConvolutionPage() {
     const [timeMode, setTimeMode] = useState<TimeMode>("continuous");
     const isDiscrete = timeMode === "discrete";
 
-    // Mobile mode
-    const [isMobile, setIsMobile] = useState(false);
-    const [isMobileM, setIsMobileM] = useState(false);
+    // Responsive layout modes
+    const [viewportWidth, setViewportWidth] = useState(1280);
+    const isMobile = viewportWidth < 600;
+    const isTablet = viewportWidth >= 600 && viewportWidth < 1100;
+    const isMobileM = viewportWidth < 1400;
+    const useScrollableLayout = viewportWidth < 1100;
 
     useEffect(() => {
-        const update = () => setIsMobile(window.innerWidth < 768);
-        update();
-        window.addEventListener("resize", update);
-        return () => window.removeEventListener("resize", update);
-    }, []);
-
-    useEffect(() => {
-        const update = () => setIsMobileM(window.innerWidth < 1400);
+        const update = () => setViewportWidth(window.innerWidth);
         update();
         window.addEventListener("resize", update);
         return () => window.removeEventListener("resize", update);
@@ -178,7 +174,11 @@ export default function ConvolutionPage() {
     const bottomSafeHeight = 46;
     const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
     const availableHeight = Math.max(240, remainingHeight); //use highest value
-    const signalPlotHeight = isMobile ? 360 : Math.floor((availableHeight - gapBottom) / 2);
+    const signalPlotHeight = isMobile
+        ? 330
+        : isTablet
+          ? 350
+          : Math.floor((availableHeight - gapBottom) / 2);
 
     // samplePointmultiplier
     const spm = 1
@@ -621,10 +621,10 @@ export default function ConvolutionPage() {
     <main
         style={{
         minHeight: "100vh",
-        height: isMobile ? "auto" : "100vh",
-        padding: isMobile ? "8px 8px 28px 8px" : "10px 12px 40px 12px",
+        height: useScrollableLayout ? "auto" : "100vh",
+        padding: isMobile ? "8px 6px 28px" : "10px 12px 40px",
         boxSizing: "border-box",
-        overflow: isMobile ? "auto" : "hidden",
+        overflow: useScrollableLayout ? "auto" : "hidden",
         color: "#ffffff",
         background: backgroundColor,
         fontSize: isMobile ? "0.9rem" : "1rem"
@@ -669,9 +669,34 @@ export default function ConvolutionPage() {
             }}
     >
         {/* Time Mode Buttons */}
-        <div style={{ display: "flex", gap: 8, marginBottom: gapBottom}}>
+        <div
+            style={{
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 8,
+                marginBottom: gapBottom,
+            }}
+        >
             <ButtonToggle label="Continuous-time" active={!isDiscrete} onClick={() => setTimeMode("continuous")} />
             <ButtonToggle label="Discrete-time" active={isDiscrete} onClick={() => setTimeMode("discrete")} />
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginLeft: isMobile ? 0 : "auto",
+                    flexBasis: isMobile ? "100%" : "auto",
+                    fontWeight: 800,
+                }}
+            >
+                <span>Convolution kernel:</span>
+                <ButtonToggle
+                    label={isHFlipped ? "h flipped ✓" : "Flip h"}
+                    active={isHFlipped}
+                    onClick={() => setIsHFlipped((previous) => !previous)}
+                />
+            </div>
         </div>
 
         {/* X and H Panels */}
@@ -684,10 +709,6 @@ export default function ConvolutionPage() {
                     source={xSource}    
                     setSource={setXSource}
                     gapBottom={gapBottom}
-                    isHSignal={false}
-                    isHFlipped={false}
-                    // dummy value
-                    setIsHFlipped={() => {}}
                 />
                 {xSource === "preset" && (
                     <>
@@ -778,9 +799,6 @@ export default function ConvolutionPage() {
                     source={hSource}    
                     setSource={setHSource}
                     gapBottom={gapBottom}
-                    isHSignal={true}
-                    isHFlipped={isHFlipped}
-                    setIsHFlipped={setIsHFlipped}
                 />
                 {hSource === "preset" && (
                 <>
