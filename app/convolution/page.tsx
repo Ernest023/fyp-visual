@@ -380,23 +380,31 @@ export default function ConvolutionPage() {
         return ySamples[bestIdx] ?? 0;
         }, [tAxis, ySamples, t0]);
 
-    const hDisplayLabel = isDiscrete ? (isHFlipped ? "h[n-k]" : "h[n]") : (isHFlipped ? "h(t-τ)" : "h(t)");
-    const xDisplayLabel = isDiscrete ? (isHFlipped ? "x[k]" : "x[n]" ) : (isHFlipped ? "x(τ)": "x(t)"); 
+    const hDisplayLabel = isDiscrete
+        ? (isHFlipped ? "h[n-k]" : "h[k-n]")
+        : (isHFlipped ? "h(t-τ)" : "h(τ-t)");
+    const xDisplayLabel = isDiscrete ? "x[k]" : "x(τ)";
 
     const xDisplayMath = isDiscrete ? (
-        isHFlipped ? <InlineMath math="x[k]" /> : <InlineMath math="x[n]" />
+        <InlineMath math="x[k]" />
     ) : (
-        isHFlipped ? <InlineMath math="x(\tau)" /> : <InlineMath math="x(t)" />
+        <InlineMath math={String.raw`x(\tau)`} />
     );
 
     const hDisplayMath = isDiscrete ? (
-        isHFlipped ? <InlineMath math="h[n-k]" /> : <InlineMath math="h[n]" />
+        isHFlipped ? <InlineMath math="h[n-k]" /> : <InlineMath math="h[k-n]" />
     ) : (
-        isHFlipped ? <InlineMath math="h(t-\tau)" /> : <InlineMath math="h(t)" />
+        isHFlipped ? (
+            <InlineMath math={String.raw`h(t-\tau)`} />
+        ) : (
+            <InlineMath math={String.raw`h(\tau-t)`} />
+        )
     );
 
-    const xInputExpr = isDiscrete ? (isHFlipped ? "k" : "n") : (isHFlipped ? "τ" : "t" );
-    const hInputExpr = isDiscrete ? (isHFlipped ? "n-k" : "n") : (isHFlipped ? "t-τ" : "t");
+    const xInputExpr = isDiscrete ? "k" : "τ";
+    const hInputExpr = isDiscrete
+        ? (isHFlipped ? "n-k" : "k-n")
+        : (isHFlipped ? "t-τ" : "τ-t");
 
     // plot data
     const inputTraces = useMemo(() => {
@@ -901,7 +909,7 @@ export default function ConvolutionPage() {
             // `Input: ${xDisplayLabel} and ${hDisplayLabel}`
             height={signalPlotHeight}
             traces={inputTraces}
-            xLabel={isDiscrete ? (isHFlipped? "k" : "n") : (isHFlipped ? "τ" : "t")}
+            xLabel={isDiscrete ? "k" : "τ"}
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
             compact={isMobile}
@@ -915,30 +923,29 @@ export default function ConvolutionPage() {
     {/* Signal Plot output convolution */}
     <div>
         <SignalPlot
-            // title={isDiscrete ? 
-            //     `Output: y[n] = Σ x[k] ${isHFlipped ? "h[n-k]" : "h[k-n]"}` : `Output: y(t) = ∫ x(τ) ${isHFlipped ? "h(t - τ)" : "h(τ - t)"} dτ`}
             title={
-                <>
-                    <strong>Output:&nbsp;</strong>
-                    {
-                        isDiscrete ? (
-                            isHFlipped ? (
-                                <InlineMath math="y[n] = \sum_{k=-\infty}^{\infty} x[k]h[n-k]" />
-                            ) : (
-                                <InlineMath math="y[n] = \sum_{k=-\infty}^{\infty} x[k]h[k-n]" />
-                            )
+                isHFlipped ? (
+                    <>
+                        <strong>Convolution output:&nbsp;</strong>
+                        {isDiscrete ? (
+                            <InlineMath
+                                math={String.raw`y[n]=\sum_{k=-\infty}^{\infty}x[k]h[n-k]`}
+                            />
                         ) : (
-                            isHFlipped ? (
-                                <InlineMath math="y(t)=\int_{-\infty}^{\infty}x(\tau)⋅h(t-\tau)\,d\tau" />
-                            ) : (
-                                <InlineMath math="y(t)=\int_{-\infty}^{\infty}x(\tau)⋅h(\tau-t)\,d\tau" />
-                            )
-                        )
-                    }
-                </>
+                            <InlineMath
+                                math={String.raw`y(t)=\int_{-\infty}^{\infty}x(\tau)\,h(t-\tau)\,d\tau`}
+                            />
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <strong>Before convolution:&nbsp;</strong>
+                        flip the kernel h, then slide it across x.
+                    </>
+                )
             }
             height={signalPlotHeight}
-            traces={outputTraces}
+            traces={isHFlipped ? outputTraces : []}
             xLabel={isDiscrete ? "n" : "t"}
             yLabel={"Amplitude"}
             xRange={[xLo, xHi]}
