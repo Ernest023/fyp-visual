@@ -4,13 +4,15 @@ import { InlineMath } from "react-katex";
 export default function FourierPairLabel({ math, isMobile }: { math: string; isMobile: boolean }) {
     return (
         <div
+            className="responsive-math-text"
             style={{
-                fontSize: "14px",
-                transform: "scale(0.99)",
-                transformOrigin: "center",
-                whiteSpace: "nowrap",
-                maxWidth: isMobile ? "calc(100vw - 72px)" : undefined,
-                overflowX: isMobile ? "auto" : undefined,
+                width: "100%",
+                minWidth: 0,
+                fontSize: isMobile ? "12px" : "14px",
+                lineHeight: 1.5,
+                whiteSpace: "normal",
+                overflowWrap: "anywhere",
+                textAlign: "center",
             }}
         >
             <InlineMath math={math} />

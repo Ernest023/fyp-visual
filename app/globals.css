@@ -61,6 +61,31 @@ input[type="range"] {
   cursor: pointer;
 }
 
+/* Keep educational text and equations visible without nested scrollbars. */
+.responsive-math-text {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.responsive-math-text .katex {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.responsive-math-text .katex-display {
+  max-width: 100%;
+  margin: 0.5em 0;
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  .responsive-math-text .katex {
+    font-size: 0.92em;
+  }
+}
+
 .home-shell {
   display: grid;
   min-height: 100vh;

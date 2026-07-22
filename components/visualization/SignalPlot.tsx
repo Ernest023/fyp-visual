@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import type { Data, Layout } from "plotly.js";
 import { theme } from "@/styles/theme";
 //npm install react-plotly.js plotly.js
@@ -81,8 +81,25 @@ export default function SignalPlot({
   compactM?: boolean;
 }) {
   const pad = 8;
-  const titleH = subtitle ? 44 : 26;
   const gap = 8;
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [titleH, setTitleH] = useState(subtitle ? 44 : 26);
+
+  // Wrapped subtitles can occupy more than one line. Measure the heading so
+  // the Plotly canvas always begins below it instead of being overlapped.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateTitleHeight = () => {
+      setTitleH(Math.ceil(header.getBoundingClientRect().height));
+    };
+
+    updateTitleHeight();
+    const observer = new ResizeObserver(updateTitleHeight);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [subtitle, compact]);
 
   const plotHeight = Math.max(160, height - pad * 2 - titleH - gap);
 
@@ -104,7 +121,7 @@ export default function SignalPlot({
         flexDirection: "column",
       }}
     >
-      <div style={{ lineHeight: 1.2 }}>
+      <div ref={headerRef} style={{ lineHeight: 1.2, minWidth: 0 }}>
         <div style={{ fontWeight: 850, fontSize: compact ? 14 : 16 }}>{title}</div>
 
         {subtitle ? (
@@ -112,12 +129,14 @@ export default function SignalPlot({
             style={{
               marginTop: 2,
               fontWeight: 650,
-              fontSize: 13,
+              fontSize: compact ? 11 : 13,
               opacity: 0.92,
-              whiteSpace: "nowrap",
-              overflowX: "auto",
+              whiteSpace: "normal",
+              overflowWrap: "anywhere",
+              minWidth: 0,
               fontFamily: "ui-serif, Times New Roman, serif",
             }}
+            className="responsive-math-text"
           >
             {subtitle}
           </div>

@@ -71,9 +71,12 @@ export default function EducationalExplanationCard({
             {isExpanded ? (
                 <div
                     id={contentId}
+                    className="responsive-math-text"
                     style={{
                         padding: "0 12px 12px",
-                        overflowX: "auto",
+                        minWidth: 0,
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
                     }}
                 >
                     {children}

@@ -324,8 +324,8 @@ export default function SamplingPage() {
         sampledSignal,
     ]);
 
-    // Sampling repeats the original spectrum around every integer multiple k*fs.
-    // This block builds those impulses plus short centre markers labelled by k.
+    // Sampling repeats the original spectrum around every integer multiple n*fs.
+    // This block builds those impulses plus short centre markers labelled by n.
     const spectrumReplicaTraces = useMemo(() => {
         const replicaCount = samplingConfig.spectrum.replicaCount;
         const traces: Data[] = [];
@@ -353,7 +353,7 @@ export default function SamplingPage() {
 
             const replicaName =
                 replicaIndex === 0
-                    ? "Base spectrum (k = 0)"
+                    ? "Base spectrum (n = 0)"
                     : "Periodic replicas";
 
             traces.push(
@@ -388,7 +388,7 @@ export default function SamplingPage() {
             guideY.push(0, guideHeight, null);
             labelX.push(centreFrequency);
             labelY.push(guideLabelHeight);
-            labels.push(`k=${replicaIndex}`);
+            labels.push(`n=${replicaIndex}`);
         }
 
         traces.push(
@@ -690,7 +690,7 @@ export default function SamplingPage() {
                         />
 
                         <InlineMath
-                            math={String.raw`f_{\mathrm{alias}}=\left|f_0-kf_s\right|`}
+                            math={String.raw`f_{\mathrm{alias}}=\left|f_0-nf_s\right|`}
                         />
                     </div>
                 </EducationalExplanationCard>
@@ -822,7 +822,7 @@ export default function SamplingPage() {
                     subtitle={
                         <>
                             <InlineMath
-                                math={String.raw`X_s(f)=\frac{1}{T_s}\sum_{k=-\infty}^{\infty}X(f-kf_s)`}
+                                math={String.raw`X_s(f)=\frac{1}{T_s}\sum_{n=-\infty}^{\infty}X(f-nf_s)`}
                             />
                         </>
                     }
