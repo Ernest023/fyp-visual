@@ -5,26 +5,22 @@ import Link from "next/link";
 // useMemo - It runs the function only when one of its dependencies changes, otherwise, it reuses the last calculated
 // useRef - It returns a mutable object with a single current property, which you can read from and write to directly
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
-import SignalSourcePreset, {ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/ControlPanelSource"
-import SignalPlot, {makeStemTraces} from "@/components/SignalPlot";
-import CustomExpressionInput from "@/components/CustomExpressionInput";
+import SignalSourcePreset, {ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/controls/ControlPanelSource"
+import SignalPlot, {makeStemTraces} from "@/components/visualization/SignalPlot";
+import CustomExpressionInput from "@/components/controls/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
-import DrawSignalControls from "@/components/DrawSignalControls";
-import DrawSignalPanel from "@/components/DrawSignalPanel";
+import DrawSignalControls from "@/components/drawing/DrawSignalControls";
+import DrawSignalPanel from "@/components/drawing/DrawSignalPanel";
 import { InlineMath } from "react-katex";
 import { getPresetValue, getDrawnValue } from "@/library/signalEvaluator";
-import { createDefaultSignalState ,type SignalSource,} from "@/library/types";
+import type { SignalSource } from "@/library/types";
+import { backgroundColor, borderColor, defaultHSignal, defaultXSignal, gapBottom } from "@/features/convolution/config";
 
-
-export const gapBottom = 7
-
-export const borderColor = "1px solid rgba(255,255,255,0.35)"
-export const backgroundColor = "rgb(0, 0, 0)"
-
-const defaultXSignal = createDefaultSignalState("rect");
-const defaultHSignal = createDefaultSignalState("tri");
+// Sampling density multiplier used by the continuous-time numerical integral.
+const spm = 1;
+const spmfix = spm - 1;
 
 export default function ConvolutionPage() {
     type TimeMode = "continuous" | "discrete";
@@ -133,7 +129,7 @@ export default function ConvolutionPage() {
     } else {
         setXWidthText(xWidth.toFixed(2));
         setHWidthText(hWidth.toFixed(2));
-    }}, [isDiscrete]);
+    }}, [hWidth, isDiscrete, xWidth]);
 
     // ==== screen height ====
     // set inital value 
@@ -180,9 +176,6 @@ export default function ConvolutionPage() {
           ? 350
           : Math.floor((availableHeight - gapBottom) / 2);
 
-    // samplePointmultiplier
-    const spm = 1
-    const spmfix = spm - 1
     //tau = array that consist x-axis position of 1400 points; top plot; 1400 to have a better intergral approx
 	//tAxis = array that consist x-axis position of 700 points; bottom plot
     //dt = spacing between tau samples in CT
@@ -258,7 +251,7 @@ export default function ConvolutionPage() {
         setHDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
     }, [tau]);
 
-    function evaluateXSignal(inputX: number): number {
+    const evaluateXSignal = useCallback((inputX: number): number => {
         if (xSource === "preset") {
             return getPresetValue(xInput, inputX, xWidth, xAmp, isDiscrete);
         }
@@ -271,9 +264,9 @@ export default function ConvolutionPage() {
             return Ax * getDrawnValue(inputX, tau, xDrawn);
         }
         return 0;
-    }
+    }, [Ax, isDiscrete, tau, xAmp, xDrawn, xExpr, xExprFn, xInput, xSource, xWidth]);
 
-    function evaluateHSignal(inputX: number): number {
+    const evaluateHSignal = useCallback((inputX: number): number => {
         if (hSource === "preset") {
             return getPresetValue(hInput, inputX, hWidth, hAmp, isDiscrete);
         }
@@ -284,30 +277,25 @@ export default function ConvolutionPage() {
         if (hSource === "draw") {
             return Ah * getDrawnValue(inputX, tau, hDrawn);
         }
-    return 0;
-    }
+        return 0;
+    }, [Ah, hAmp, hDrawn, hExpr, hExprFn, hInput, hSource, hWidth, isDiscrete, tau]);
 
     // create y-axis point; original unshifted signals; 
     // CT: x(t0) ; DT: x[n0]
-    // tau = x-positions; xSamples = y-values of x at those positions; hSamples = y-values of h at those positions
+    // tau = x-positions; xSamples = y-values of x at those positions
     const xSamples = useMemo(() => {
         return tau.map((v) => evaluateXSignal(v));
-    }, [tau, xSource, xInput, xWidth, xAmp, xExpr, xExprFn, xDrawn, Ax]);
-
-    // CT: h(t0) ; DT: h[n0] It does not depend on t0, so moving the slider does nothing to it.
-    const hSamples = useMemo(() => {
-        return tau.map((v) => evaluateHSignal(v));
-    }, [tau, hSource, hInput, hWidth, hAmp, hExpr, hExprFn,hDrawn, Ah]);
+    }, [evaluateXSignal, tau]);
 
     // CT: h(t0 - τ) ; DT: h[n0 - k]
     const hFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(t0 - v));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn, hDrawn, Ah]);
+    }, [evaluateHSignal, t0, tau]);
 
     // 
     const hShiftedNotFlippedSamples = useMemo(() => {
         return tau.map((v) => evaluateHSignal(v - t0));
-    }, [tau, t0, hSource, hInput, hWidth, hAmp, hExpr, hExprFn, hDrawn, Ah]);
+    }, [evaluateHSignal, t0, tau]);
 
     // h signal flipped state
     const [isHFlipped, setIsHFlipped] = useState(false);
@@ -364,7 +352,7 @@ export default function ConvolutionPage() {
         }
             return sum;
         });
-    }, [isDiscrete, isHFlipped, tAxis, tau, dt, xInput, xWidth, xAmp, hInput, hWidth, hAmp, xExprFn, hExprFn,xSource,hSource,xDrawn,hDrawn,Ax,Ah,]);
+    }, [dt, evaluateHSignal, evaluateXSignal, isDiscrete, isHFlipped, tAxis, tau]);
 
     // Current output value at slider
     const yAtT0 = useMemo(() => {
@@ -456,7 +444,7 @@ export default function ConvolutionPage() {
             hoverinfo: "skip",
         },
     ];
-    }, [tau, xSamples, hDisplaySamples, productSamples, isDiscrete, isHFlipped]);
+    }, [hDisplayLabel, hDisplaySamples, isDiscrete, productSamples, tau, xDisplayLabel, xSamples]);
 
     // ===== output plot y-range =====
     // Lowest visible output value, but include 0 so the axis still shows the baseline
@@ -524,7 +512,7 @@ export default function ConvolutionPage() {
                 hoverinfo: "skip",
             },
         ];
-    }, [isDiscrete, tAxis, ySamples, yReveal, t0, yAtT0, outYMin, outYMax]);
+    }, [isDiscrete, outYMax, outYMin, t0, tAxis, yAtT0, yReveal]);
 
     // ===== fixed x-axis range for plotting =====
     // Add a little extra padding in DT so the outermost stems are not cut too tightly.
@@ -598,7 +586,7 @@ export default function ConvolutionPage() {
         if (hSource === "preset") {
             setHWidth(1);
             setHAmp(1);
-            setHInput("tri");
+            setHInput(defaultHSignal.preset);
             setHWidthText(isDiscrete ? "1" : "1.00");
             setHAmpText("1.00");
             setT0(isDiscrete ? -2 : -2.5);

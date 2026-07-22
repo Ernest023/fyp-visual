@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // useEffect Accepts a function that contains imperative, possibly effectful code.
 // useMemo will only recompute the memoized value when one of the deps has changed.
@@ -18,6 +18,24 @@ type DrawSignalCanvasProps = {
   height?: number;
   discrete?: boolean;
 };
+
+// Round off small decimals for compact axis labels.
+function fmt(n: number) {
+  const nearInt = Math.abs(n - Math.round(n)) < 1e-9;
+  if (nearInt) return String(Math.round(n));
+  return n.toFixed(Math.abs(n) >= 10 ? 0 : 1);
+}
+
+// Converts a signal-domain value into a horizontal canvas position.
+function tauToX(t: number, w: number, tMin: number, tMax: number) {
+  return ((t - tMin) / (tMax - tMin)) * w;
+}
+
+// Converts a signal amplitude into the canvas's inverted vertical coordinates.
+function valueToY(v: number, h: number, yMin: number, yMax: number) {
+  const u = (v - yMin) / (yMax - yMin);
+  return (1 - u) * h;
+}
 
 export default function DrawSignalCanvas({
   tau,
@@ -39,13 +57,6 @@ export default function DrawSignalCanvas({
   const tMin = useMemo(() => tau[0], [tau]);
   const tMax = useMemo(() => tau[tau.length - 1], [tau]);
 
-  // Round off small decimal and return as string
-  function fmt(n: number) {
-    const nearInt = Math.abs(n - Math.round(n)) < 1e-9;
-    if (nearInt) return String(Math.round(n));
-    return n.toFixed(Math.abs(n) >= 10 ? 0 : 1);
-  }
-
   // [tMin, tMax] dependencies array, compute only if these changes
   const xLabels = useMemo(() => ({ left: fmt(tMin), mid: fmt(0), right: fmt(tMax) }), [tMin, tMax]);
 
@@ -54,15 +65,6 @@ export default function DrawSignalCanvas({
     return { top: fmt(yMax), mid: fmt(0), bot: fmt(yMin), showZero };
   }, [yMin, yMax]);
 
-  // converts an x-axis signal value t into a pixel x-position on the canvas
-  function tauToX(t: number, w: number) {
-    return ((t - tMin) / (tMax - tMin)) * w;
-  }
-  // converts a y-value into a canvas y-pixel. in math graphs, larger y means higher up. But on a screen, larger y means lower down
-  function valueToY(v: number, h: number) {
-    const u = (v - yMin) / (yMax - yMin);
-    return (1 - u) * h;
-  }
   // converts a pixel x-position back into the nearest index in the tau array
   function xToNearestIndex(px: number, w: number) {
     if (tau.length <= 1) return 0;
@@ -71,7 +73,7 @@ export default function DrawSignalCanvas({
     return Math.max(0, Math.min(tau.length - 1, idx));
   }
 
-  function redraw() {
+  const redraw = useCallback(() => {
     // check if canva exist
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,9 +113,9 @@ export default function DrawSignalCanvas({
     }
 
     // base line (y=0 if visible, otherwise yMin)
-    let yBase = valueToY(yMin, h);
+    let yBase = valueToY(yMin, h, yMin, yMax);
     if (yMin < 0 && yMax > 0) {
-      yBase = valueToY(0, h);
+      yBase = valueToY(0, h, yMin, yMax);
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
       ctx.beginPath();
       ctx.moveTo(0, yBase);
@@ -136,8 +138,8 @@ export default function DrawSignalCanvas({
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i = 0; i < tau.length; i++) {
-        const x = tauToX(tau[i], w);
-        const y = valueToY(samples[i] ?? 0, h);
+        const x = tauToX(tau[i], w, tMin, tMax);
+        const y = valueToY(samples[i] ?? 0, h, yMin, yMax);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -150,8 +152,8 @@ export default function DrawSignalCanvas({
     ctx.lineWidth = 2;
 
     for (let i = 0; i < tau.length; i++) {
-      const x = tauToX(tau[i], w);
-      const y = valueToY(samples[i] ?? 0, h);
+      const x = tauToX(tau[i], w, tMin, tMax);
+      const y = valueToY(samples[i] ?? 0, h, yMin, yMax);
 
       // stem; draw verticle line for discrete
       ctx.beginPath();
@@ -165,17 +167,17 @@ export default function DrawSignalCanvas({
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-  }
+  }, [discrete, height, samples, tMax, tMin, tau, yMax, yMin]);
   // redraw when any of the dependencies value changes
   useEffect(() => {
     redraw();
-  }, [samples, tau, height, yMin, yMax, discrete]);
+  }, [redraw]);
   // redraw when window resize because canva depend on screen size value
   useEffect(() => {
     const onResize = () => redraw();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [redraw]);
 
   function applyPointer(px: number, py: number) {
     const canvas = canvasRef.current;

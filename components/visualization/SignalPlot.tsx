@@ -2,12 +2,18 @@
 
 import dynamic from "next/dynamic";
 import React from "react";
+import type { Data, Layout } from "plotly.js";
 //npm install react-plotly.js plotly.js
 //npm install -D @types/react-plotly.js @types/plotly.js
-const Plot: any = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+
+// Pages assemble some traces dynamically. This keeps their plain trace
+// objects type-safe without leaking `any` through the shared component.
+type PlotTrace = Data | Record<string, unknown>;
+type PlotShape = NonNullable<Layout["shapes"]>[number] | Record<string, unknown>;
 
 // StemTraces for discrete
-export function makeStemTraces(x: number[], y: Array<number | null>, name: string, color: string) {
+export function makeStemTraces(x: number[], y: Array<number | null>, name: string, color: string): Data[] {
   const xs: (number | null)[] = [];
   const ys: (number | null)[] = [];
 
@@ -28,19 +34,19 @@ export function makeStemTraces(x: number[], y: Array<number | null>, name: strin
   const stems = {
     x: xs,
     y: ys,
-    type: "scatter",
-    mode: "lines",
+    type: "scatter" as const,
+    mode: "lines" as const,
     name: `${name} stems`,
     showlegend: false,
     line: { color, width: 2 },
-    hoverinfo: "skip",
+    hoverinfo: "skip" as const,
   };
 
   const markers = {
     x: mx,
     y: my,
-    type: "scatter",
-    mode: "markers",
+    type: "scatter" as const,
+    mode: "markers" as const,
     name,
     marker: { color, size: 7 },
   };
@@ -63,9 +69,9 @@ export default function SignalPlot({
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
-  traces: any[];
+  traces: PlotTrace[];
   height: number;
-  shapes?: any[];
+  shapes?: PlotShape[];
   xLabel?: string;
   yLabel?: string;
   xRange?: [number, number];
@@ -119,7 +125,7 @@ export default function SignalPlot({
       <div style={{ height: gap }} />
 
       <Plot
-        data={traces}
+        data={traces as Data[]}
         layout={{
           height: plotHeight,
           margin: {
@@ -193,7 +199,7 @@ export default function SignalPlot({
             borderwidth: 1,
           },
 
-          shapes,
+          shapes: shapes as Layout["shapes"],
         }}
         config={{ displayModeBar: false, responsive: true }}
         style={{ width: "100%" }}

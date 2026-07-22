@@ -1,6 +1,6 @@
 "use client";
 
-import DrawSignalCanvas from "@/components/DrawSignalCanvas";
+import DrawSignalCanvas from "@/components/drawing/DrawSignalCanvas";
 
 type DrawSignalPanelProps = {
     open: boolean;

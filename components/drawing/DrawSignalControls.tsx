@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ButtonToggle, TextBoxSliders  } from "./ControlPanelSource";
+import { ButtonToggle, TextBoxSliders } from "@/components/controls/ControlPanelSource";
 import { theme } from "@/styles/theme";
 
 

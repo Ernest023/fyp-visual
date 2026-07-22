@@ -2,50 +2,14 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import SignalPlot, { makeStemTraces } from "@/components/SignalPlot";
-import { ButtonToggle, ParameterSlider } from "@/components/ControlPanelSource";
+import SignalPlot, { makeStemTraces } from "@/components/visualization/SignalPlot";
+import { ButtonToggle, ParameterSlider } from "@/components/controls/ControlPanelSource";
 import { theme } from "@/styles/theme";
 import { InlineMath, BlockMath } from "react-katex";
-
-type PageMode = "sine-builder" | "transform-pair";
-
-type PairMode =
-    | "exp-right"
-    | "exp-left"
-    | "double-exp"
-    | "delta"
-    | "constant"
-    | "complex-exp"
-    | "cosine"
-    | "sine"
-    | "step"
-    | "rect-to-sinc"
-    | "triangle"
-    | "sinc-to-rect"
-    | "impulse-train";
-
-type TransformPairConfig = {
-    label: React.ReactNode;
-    formula: string;
-    timeTitle: React.ReactNode;
-    freqTitle: React.ReactNode;
-    timeName: string;
-    freqName: string;
-    timeSamples: number[];
-    freqSamples: number[];
-
-    timeImpulseTraces?: any[];
-    freqImpulseTraces?: any[];
-    timeYRange?: [number, number];
-    freqYRange?: [number, number];
-};
-
-type SineComponent = {
-    id: number;
-    frequency: number;
-    amplitude: number;
-    phase: number;
-};
+import type { PageMode, PairMode, TransformPairConfig, SineComponent } from "@/features/frequency/types";
+import { formatPhase, getPhaseSymbol, rect, sinc, wrapPhase } from "@/features/frequency/frequencyMath";
+import { makeImpulseTraces } from "@/features/frequency/frequencyPlot";
+import FourierPairLabel from "@/features/frequency/FourierPairLabel";
 
 const MAX_SINES = 8;
 
@@ -59,54 +23,6 @@ const componentColors = [
     "#eab308",
     "#ec4899",
 ];
-
-function wrapPhase(angle: number) {
-    let wrapped = angle;
-
-    while (wrapped > Math.PI) wrapped -= 2 * Math.PI;
-    while (wrapped < -Math.PI) wrapped += 2 * Math.PI;
-
-    return wrapped;
-}
-
-function formatPhase(phi: number) {
-    const tolerance = 0.02;
-    const wrappedPhi = wrapPhase(phi);
-
-    const phaseMap = [
-        { value: -Math.PI, label: "-π", degree: -180 },
-        { value: (-3 * Math.PI) / 4, label: "-3π/4", degree: -135 },
-        { value: -Math.PI / 2, label: "-π/2", degree: -90 },
-        { value: -Math.PI / 4, label: "-π/4", degree: -45 },
-        { value: 0, label: "0", degree: 0 },
-        { value: Math.PI / 4, label: "π/4", degree: 45 },
-        { value: Math.PI / 2, label: "π/2", degree: 90 },
-        { value: (3 * Math.PI) / 4, label: "3π/4", degree: 135 },
-        { value: Math.PI, label: "π", degree: 180 },
-    ];
-
-    for (const p of phaseMap) {
-        if (Math.abs(wrappedPhi - p.value) < tolerance) {
-            return `${p.label} rad (${p.degree}°)`;
-        }
-    }
-
-    const deg = (wrappedPhi * 180) / Math.PI;
-    return `${wrappedPhi.toFixed(2)} rad (${deg.toFixed(0)}°)`;
-}
-
-function getPhaseSymbol(phi: number) {
-    return formatPhase(phi).split(" rad")[0];
-}
-
-function sinc(x: number) {
-    if (Math.abs(x) < 1e-9) return 1;
-    return Math.sin(Math.PI * x) / (Math.PI * x);
-}
-
-function rect(x: number) {
-    return Math.abs(x) <= 0.5 ? 1 : 0;
-}
 
 export default function FourierPage() {
     const [viewportWidth, setViewportWidth] = useState(1280);
@@ -374,8 +290,6 @@ export default function FourierPage() {
             <InlineMath math="X(f)=" />
 
             {components.map((c, i) => {
-                const mag = (Math.abs(c.amplitude) / 2).toFixed(2);
-
                 return (
                     <span key={i}>
                         {i > 0 && <span style={{ color: "white" }}> + </span>}
@@ -388,52 +302,6 @@ export default function FourierPage() {
             })}
         </div>
     );
-
-    function makeImpulseTraces(
-        impulses: { x: number; height: number; label?: string }[],
-        name: string,
-        color = "rgba(37,99,235,0.95)"
-    ) {
-        const stemX: (number | null)[] = [];
-        const stemY: (number | null)[] = [];
-
-        const markerX: number[] = [];
-        const markerY: number[] = [];
-
-        impulses.forEach((impulse) => {
-            stemX.push(impulse.x, impulse.x, null);
-            stemY.push(0, impulse.height, null);
-
-            markerX.push(impulse.x);
-            markerY.push(impulse.height);
-        });
-
-        return [
-            {
-                x: stemX,
-                y: stemY,
-                type: "scatter",
-                mode: "lines",
-                name: `${name} stems`,
-                showlegend: false,
-                line: { color, width: 3 },
-                hoverinfo: "skip",
-            },
-            {
-                x: markerX,
-                y: markerY,
-                type: "scatter",
-                mode: "markers",
-                name,
-                showlegend: false,
-                marker: {
-                    color,
-                    size: 14,
-                    symbol: "triangle-up",
-                },
-            },
-        ];
-    }
 
     const fourierTransformPhaseText = (
         <div
@@ -479,27 +347,10 @@ export default function FourierPage() {
         return Array.from({ length: 6000 }, (_, i) => -10 + (20 * i) / 5999);
     }, []);
 
-    function PairLabel({ math }: { math: string }) {
-        return (
-            <div
-                style={{
-                    fontSize: "14px",
-                    transform: "scale(0.99)",
-                    transformOrigin: "center",
-                    whiteSpace: "nowrap",
-                    maxWidth: isMobile ? "calc(100vw - 72px)" : undefined,
-                    overflowX: isMobile ? "auto" : undefined,
-                }}
-            >
-                <InlineMath math={math} />
-            </div>
-        );
-    }
-
     const transformPairs: Record<PairMode, TransformPairConfig> = {
         // e^(-at) u(t)
         "exp-right": {
-            label: <PairLabel math="\mathrm{e}^{-at}u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a+j2\pi f}" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\mathrm{e}^{-at}u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a+j2\pi f}" />,
             formula: `\\mathrm{e}^{-${pairWidth.toFixed(2)}t}u(t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}+j2\\pi f},\\quad a>0`,
             timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{-at}u(t)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{a+j2\pi f}" /></>,
@@ -510,7 +361,7 @@ export default function FourierPage() {
         },
 
         "exp-left": {
-            label: <PairLabel math="\mathrm{e}^{at}u(-t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a-j2\pi f}" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\mathrm{e}^{at}u(-t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{a-j2\pi f}" />,
             formula: `\\mathrm{e}^{${pairWidth.toFixed(2)}t}u(-t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}-j2\\pi f},\\quad a>0`,
             timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{at}u(-t)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{a-j2\pi f}" /></>,
@@ -522,7 +373,7 @@ export default function FourierPage() {
 
         // e^(-a|t|)
         "double-exp": {
-            label: <PairLabel math="\mathrm{e}^{-a|t|}\overset{\mathcal F}{\longleftrightarrow}\frac{2a}{a^2+(2\pi f)^2}" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\mathrm{e}^{-a|t|}\overset{\mathcal F}{\longleftrightarrow}\frac{2a}{a^2+(2\pi f)^2}" />,
             formula: `\\mathrm{e}^{-${pairWidth.toFixed(2)}|t|}\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{2(${pairWidth.toFixed(2)})}{(${pairWidth.toFixed(2)})^2+(2\\pi f)^2}`,
             timeTitle: <>Time Domain: <InlineMath math="\mathrm{e}^{-a|t|}" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\frac{2a}{a^2+(2\pi f)^2}" /></>,
@@ -533,7 +384,7 @@ export default function FourierPage() {
         },
 
         delta: {
-        label: <PairLabel math="\delta(t)\overset{\mathcal F}{\longleftrightarrow}1" />,
+        label: <FourierPairLabel isMobile={isMobile} math="\delta(t)\overset{\mathcal F}{\longleftrightarrow}1" />,
         formula: "\\delta(t)\\overset{\\mathcal F}{\\longleftrightarrow}1",
         timeTitle: <>Time Domain: <InlineMath math="\delta(t)" /></>,
         freqTitle: <>Frequency Domain: <InlineMath math="1" /></>,
@@ -554,7 +405,7 @@ export default function FourierPage() {
         
         // 1
         constant: {
-            label: <PairLabel math="1\overset{\mathcal F}{\longleftrightarrow}\delta(f)" />,
+            label: <FourierPairLabel isMobile={isMobile} math="1\overset{\mathcal F}{\longleftrightarrow}\delta(f)" />,
             formula: "1\\overset{\\mathcal F}{\\longleftrightarrow}\\delta(f)",
             timeTitle: <>Time Domain: <InlineMath math="1" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\delta(f)" /></>,
@@ -570,7 +421,7 @@ export default function FourierPage() {
         },
 
         "complex-exp": {
-            label: <PairLabel math="\mathrm{e}^{j2\pi f_0t}\overset{\mathcal F}{\longleftrightarrow}\delta(f-f_0)" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\mathrm{e}^{j2\pi f_0t}\overset{\mathcal F}{\longleftrightarrow}\delta(f-f_0)" />,
             formula: `\\mathrm{e}^{j2\\pi(${pairWidth.toFixed(2)})t}\\overset{\\mathcal F}{\\longleftrightarrow}\\delta\\left(f-${pairWidth.toFixed(2)}\\right)`,
             timeTitle: <>Time Domain: <InlineMath math="\cos(2\pi f_0t)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\delta(f-f_0)" /></>,
@@ -586,7 +437,7 @@ export default function FourierPage() {
         },
 
         cosine: {
-            label: <PairLabel math="\cos(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\left[\delta(f-f_0)+\delta(f+f_0)\right]" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\cos(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\left[\delta(f-f_0)+\delta(f+f_0)\right]" />,
             formula: `\\cos\\left(2\\pi(${pairWidth.toFixed(2)})t\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2}\\left[\\delta\\left(f-${pairWidth.toFixed(2)}\\right)+\\delta\\left(f+${pairWidth.toFixed(2)}\\right)\\right]`,
             timeTitle: <>Time Domain: <InlineMath math="\cos(2\pi f_0t)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\frac12[\delta(f-f_0)+\delta(f+f_0)]" /></>,
@@ -605,7 +456,7 @@ export default function FourierPage() {
         },
 
         sine: {
-            label: <PairLabel math="\sin(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2j}\left[\delta(f-f_0)-\delta(f+f_0)\right]" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\sin(2\pi f_0t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2j}\left[\delta(f-f_0)-\delta(f+f_0)\right]" />,
             formula: `\\sin\\left(2\\pi(${pairWidth.toFixed(2)})t\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2j}\\left[\\delta\\left(f-${pairWidth.toFixed(2)}\\right)-\\delta\\left(f+${pairWidth.toFixed(2)}\\right)\\right]`,
             timeTitle: <>Time Domain: <InlineMath math="\sin(2\pi f_0t)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="\frac{1}{2j}[\delta(f-f_0)-\delta(f+f_0)]" /></>,
@@ -624,7 +475,7 @@ export default function FourierPage() {
         },
 
         step: {
-            label: <PairLabel math="u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\delta(f)+\frac{1}{j2\pi f}" />,
+            label: <FourierPairLabel isMobile={isMobile} math="u(t)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{2}\delta(f)+\frac{1}{j2\pi f}" />,
             formula:
                 "u(t)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{2}\\delta(f)+\\frac{1}{j2\\pi f}",
             timeTitle: (
@@ -647,7 +498,7 @@ export default function FourierPage() {
         },
 
         "rect-to-sinc": {
-            label: <PairLabel math="\operatorname{rect}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}(Tf)" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\operatorname{rect}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}(Tf)" />,
             formula: `\\operatorname{rect}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{sinc}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
             timeTitle: <>Time Domain: <InlineMath math="\operatorname{rect}\left(\frac{t}{T}\right)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{sinc}(Tf)" /></>,
@@ -658,7 +509,7 @@ export default function FourierPage() {
         },
 
         triangle: {
-            label: <PairLabel math="\Delta\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}^2(Tf)" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\Delta\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{sinc}^2(Tf)" />,
             formula: `\\Delta\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{sinc}^{2}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
             timeTitle: <>Time Domain: <InlineMath math="\Delta(t/T)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{sinc}^2(Tf)" /></>,
@@ -669,7 +520,7 @@ export default function FourierPage() {
         },
 
         "sinc-to-rect": {
-            label: <PairLabel math="\operatorname{sinc}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{rect}(Tf)" />,
+            label: <FourierPairLabel isMobile={isMobile} math="\operatorname{sinc}\left(\frac{t}{T}\right)\overset{\mathcal F}{\longleftrightarrow}T\operatorname{rect}(Tf)" />,
             formula: `\\operatorname{sinc}\\!\\left(\\frac{t}{${pairWidth.toFixed(2)}}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}${pairWidth.toFixed(2)}\\operatorname{rect}\\!\\left(${pairWidth.toFixed(2)}f\\right)`,
             timeTitle: <>Time Domain: <InlineMath math="\operatorname{sinc}\left(\frac{t}{T}\right)" /></>,
             freqTitle: <>Frequency Domain: <InlineMath math="T\operatorname{rect}(Tf)" /></>,
@@ -681,7 +532,7 @@ export default function FourierPage() {
 
         "impulse-train": {
             label: (
-                <PairLabel math="\sum_{n=-\infty}^{\infty}\delta(t-nT_0)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{T_0}\sum_{n=-\infty}^{\infty}\delta(f-nf_0)" />
+                <FourierPairLabel isMobile={isMobile} math="\sum_{n=-\infty}^{\infty}\delta(t-nT_0)\overset{\mathcal F}{\longleftrightarrow}\frac{1}{T_0}\sum_{n=-\infty}^{\infty}\delta(f-nf_0)" />
             ),
             formula: `\\sum_{n=-\\infty}^{\\infty}\\delta\\left(t-n${pairWidth.toFixed(2)}\\right)\\overset{\\mathcal F}{\\longleftrightarrow}\\frac{1}{${pairWidth.toFixed(2)}}\\sum_{n=-\\infty}^{\\infty}\\delta\\left(f-n\\frac{1}{${pairWidth.toFixed(2)}}\\right),\\quad f_0=\\frac{1}{T_0}`,
             timeTitle: (<>Time Domain:{" "}<InlineMath math="\sum_{n=-\infty}^{\infty}\delta(t-nT_0)" /></>),
