@@ -9,11 +9,13 @@ export default function EducationalExplanationCard({
     children,
     marginTop = 12,
     defaultExpanded = true,
+    accentColor,
 }: {
     title: string;
     children: ReactNode;
     marginTop?: number;
     defaultExpanded?: boolean;
+    accentColor?: string;
 }) {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
     const contentId = useId();
@@ -24,6 +26,7 @@ export default function EducationalExplanationCard({
                 marginTop,
                 borderRadius: 12,
                 border: theme.borders.subtle,
+                borderLeft: accentColor ? `4px solid ${accentColor}` : undefined,
                 background: theme.colors.panelBackground,
                 overflow: "hidden",
             }}

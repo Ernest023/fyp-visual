@@ -547,85 +547,157 @@ export default function SamplingPage() {
                     />
                 </div>
 
-                {/* Live Nyquist status */}
+                {/* Immediate feedback: current values and their meaning stay together. */}
                 <div
                     style={{
                         marginTop: isMobile ? 10 : 12,
-                        padding: isMobile ? 9 : 12,
-                        borderRadius: 10,
-                        border: nyquistStatus.border,
-                        background: nyquistStatus.background,
+                        display: "grid",
+                        gridTemplateColumns: useSingleColumnPlots
+                            ? "1fr"
+                            : "repeat(2, minmax(0, 1fr))",
+                        gap: theme.spacing.controlGap,
+                        alignItems: "stretch",
                     }}
                 >
                     <div
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            flexWrap: "wrap",
-                            gap: isMobile ? 8 : 14,
-                            fontSize: isMobile ? 13 : 16,
+                            padding: isMobile ? 9 : 12,
+                            borderRadius: 10,
+                            border: nyquistStatus.border,
+                            background: nyquistStatus.background,
                         }}
                     >
-                        <strong
+                        <div
                             style={{
-                                color: nyquistStatus.color,
-                                fontSize: isMobile ? 14 : 16,
+                                marginBottom: 8,
+                                fontWeight: 800,
+                                color: theme.colors.text,
                             }}
                         >
-                            {nyquistStatus.label}
-                        </strong>
+                            Current sampling status
+                        </div>
 
-                        <span>
-                            Signal frequency:{" "}
-                            <InlineMath
-                                math={`f_0=${signalFrequency.toFixed(
-                                    2
-                                )}\\,\\mathrm{Hz}`}
-                            />
-                        </span>
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                gap: isMobile ? 8 : 14,
+                                fontSize: isMobile ? 13 : 16,
+                            }}
+                        >
+                            <strong
+                                style={{
+                                    color: nyquistStatus.color,
+                                    fontSize: isMobile ? 14 : 16,
+                                }}
+                            >
+                                {nyquistStatus.label}
+                            </strong>
 
-                        <span>
-                            Nyquist rate:{" "}
-                            <InlineMath
-                                math={`2f_0=${nyquistRate.toFixed(
-                                    2
-                                )}\\,\\mathrm{Hz}`}
-                            />
-                        </span>
-
-                        <span>
-                            Sampling rate:{" "}
-                            <InlineMath
-                                math={`f_s=${samplingFrequency.toFixed(
-                                    2
-                                )}\\,\\mathrm{Hz}`}
-                            />
-                        </span>
-
-                        <span>
-                            Sampling period:{" "}
-                            <InlineMath
-                                math={`T_s=${samplingPeriod.toFixed(
-                                    4
-                                )}\\,\\mathrm{s}`}
-                            />
-                        </span>
-
-                        {isAliasing && (
                             <span>
-                                Observed alias:{" "}
+                                Signal frequency:{" "}
                                 <InlineMath
-                                    math={`f_{\\mathrm{alias}}=${aliasFrequency.toFixed(
+                                    math={`f_0=${signalFrequency.toFixed(
                                         2
                                     )}\\,\\mathrm{Hz}`}
                                 />
                             </span>
-                        )}
+
+                            <span>
+                                Nyquist rate:{" "}
+                                <InlineMath
+                                    math={`2f_0=${nyquistRate.toFixed(
+                                        2
+                                    )}\\,\\mathrm{Hz}`}
+                                />
+                            </span>
+
+                            <span>
+                                Sampling rate:{" "}
+                                <InlineMath
+                                    math={`f_s=${samplingFrequency.toFixed(
+                                        2
+                                    )}\\,\\mathrm{Hz}`}
+                                />
+                            </span>
+
+                            <span>
+                                Sampling period:{" "}
+                                <InlineMath
+                                    math={`T_s=${samplingPeriod.toFixed(
+                                        4
+                                    )}\\,\\mathrm{s}`}
+                                />
+                            </span>
+
+                            {isAliasing && (
+                                <span>
+                                    Signed alias:{" "}
+                                    <InlineMath
+                                        math={`f_{\\mathrm{alias}}=${signedAliasFrequency.toFixed(
+                                            2
+                                        )}\\,\\mathrm{Hz}`}
+                                    />
+                                </span>
+                            )}
+                        </div>
                     </div>
+
+                    <EducationalExplanationCard
+                        title="What this means"
+                        marginTop={0}
+                        accentColor={nyquistStatus.color}
+                    >
+                        {isAliasing ? (
+                            <div>
+                                Since <InlineMath math="f_s<2f_0" />, the shifted
+                                spectral replicas overlap. The samples represent a
+                                baseband sinusoid at{" "}
+                                <InlineMath
+                                    math={`${signedAliasFrequency.toFixed(
+                                        2
+                                    )}\\,\\mathrm{Hz}`}
+                                />
+                                . The reconstructed waveform therefore differs from
+                                the original.
+                                {signedAliasFrequency < 0 && (
+                                    <>
+                                        {" "}The negative frequency reverses the sine&apos;s
+                                        direction; at zero phase this appears as a
+                                        180° phase reversal at{" "}
+                                        <InlineMath
+                                            math={`${aliasFrequency.toFixed(
+                                                2
+                                            )}\\,\\mathrm{Hz}`}
+                                        />
+                                        .
+                                    </>
+                                )}
+                            </div>
+                        ) : isAtNyquist ? (
+                            <div>
+                                The system is exactly at{" "}
+                                <InlineMath math="f_s=2f_0" />. This boundary is
+                                phase-sensitive: a zero-phase sine can produce only
+                                zero-valued samples, so practical systems sample above
+                                this rate.
+                            </div>
+                        ) : (
+                            <div>
+                                Since <InlineMath math="f_s>2f_0" />, the spectral
+                                replicas remain separated and the original sinusoid
+                                can be reconstructed without aliasing.
+                            </div>
+                        )}
+                    </EducationalExplanationCard>
                 </div>
 
                 {/* Formula explanation */}
-                <EducationalExplanationCard title="Sampling relationships">
+                <EducationalExplanationCard
+                    title="Sampling relationships"
+                    defaultExpanded={false}
+                >
                     <div
                         style={{
                             display: "flex",
@@ -800,42 +872,6 @@ export default function SamplingPage() {
                 />
             </div>
 
-            <EducationalExplanationCard title="Observation" marginTop={theme.spacing.controlGap}>
-                {isAliasing ? (
-                    <div>
-                        Since{" "}
-                        <InlineMath math="f_s<2f_0" />, the
-                        shifted spectral replicas overlap. The
-                        samples can therefore also represent a
-                        lower-frequency sinusoid at{" "}
-                        <InlineMath
-                            math={`${aliasFrequency.toFixed(
-                                2
-                            )}\\,\\mathrm{Hz}`}
-                        />
-                        , causing the reconstructed waveform to
-                        differ from the original.
-                    </div>
-                ) : isAtNyquist ? (
-                    <div>
-                        The system is operating exactly at the
-                        Nyquist limit,{" "}
-                        <InlineMath math="f_s=2f_0" />. This is a
-                        critical boundary: sampling phase and
-                        timing become especially important, so
-                        practical systems normally sample above
-                        this rate.
-                    </div>
-                ) : (
-                    <div>
-                        Since{" "}
-                        <InlineMath math="f_s>2f_0" />, the
-                        spectral replicas remain separated. The
-                        original sinusoid can be reconstructed
-                        without aliasing.
-                    </div>
-                )}
-            </EducationalExplanationCard>
         </ResponsiveLabPageShell>
     );
 }
