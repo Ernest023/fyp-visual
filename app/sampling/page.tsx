@@ -631,16 +631,6 @@ export default function SamplingPage() {
                                 />
                             </span>
 
-                            {isAliasing && (
-                                <span>
-                                    Signed alias:{" "}
-                                    <InlineMath
-                                        math={`f_{\\mathrm{alias}}=${signedAliasFrequency.toFixed(
-                                            2
-                                        )}\\,\\mathrm{Hz}`}
-                                    />
-                                </span>
-                            )}
                         </div>
                     </div>
 
@@ -652,28 +642,9 @@ export default function SamplingPage() {
                         {isAliasing ? (
                             <div>
                                 Since <InlineMath math="f_s<2f_0" />, the shifted
-                                spectral replicas overlap. The samples represent a
-                                baseband sinusoid at{" "}
-                                <InlineMath
-                                    math={`${signedAliasFrequency.toFixed(
-                                        2
-                                    )}\\,\\mathrm{Hz}`}
-                                />
-                                . The reconstructed waveform therefore differs from
-                                the original.
-                                {signedAliasFrequency < 0 && (
-                                    <>
-                                        {" "}The negative frequency reverses the sine&apos;s
-                                        direction; at zero phase this appears as a
-                                        180° phase reversal at{" "}
-                                        <InlineMath
-                                            math={`${aliasFrequency.toFixed(
-                                                2
-                                            )}\\,\\mathrm{Hz}`}
-                                        />
-                                        .
-                                    </>
-                                )}
+                                spectral replicas overlap. The samples no longer
+                                uniquely represent the original signal, so the
+                                reconstructed waveform differs from it.
                             </div>
                         ) : isAtNyquist ? (
                             <div>
