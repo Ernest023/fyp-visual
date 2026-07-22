@@ -32,7 +32,7 @@ export const frequencyConfig = {
     plotHeights: {
         mobile: 315,
         tablet: 350,
-        desktop: 270,
+        desktop: 240,
     },
     componentColors: theme.chartSeries,
 } as const;

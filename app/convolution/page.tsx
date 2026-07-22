@@ -2,9 +2,8 @@
 
 // useState - returns an array with two elements: the current state value and a function to update that value
 // useMemo - It runs the function only when one of its dependencies changes, otherwise, it reuses the last calculated
-// useRef - It returns a mutable object with a single current property, which you can read from and write to directly
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
 import SignalSourcePreset, { TextBoxSliders, TSliders } from "@/components/controls/ControlPanelSource"
 import SignalPlot, {makeStemTraces} from "@/components/visualization/SignalPlot";
@@ -36,7 +35,6 @@ export default function ConvolutionPage() {
     const isMobile = viewportWidth < theme.breakpoints.mobile;
     const isTablet = viewportWidth >= theme.breakpoints.mobile && viewportWidth < theme.breakpoints.tablet;
     const isMobileM = viewportWidth < theme.breakpoints.desktop;
-    const useScrollableLayout = viewportWidth < theme.breakpoints.tablet;
 
     useEffect(() => {
         const update = () => setViewportWidth(window.innerWidth);
@@ -142,13 +140,6 @@ export default function ConvolutionPage() {
     // ==== screen height ====
     // set inital value 
     const [vh, setVh] = useState<number>(convolutionConfig.layout.initialViewportHeight);
-    // ref measured heights
-    const headerRef = useRef<HTMLDivElement | null>(null);
-    const controlsRef = useRef<HTMLDivElement | null>(null);
-
-    const [headerH, setHeaderH] = useState(0);
-    const [controlsH, setControlsH] = useState(0);
-
     // wait until browser is ready and get real browser height
     useEffect(() => {
         const update = () => setVh(window.innerHeight);
@@ -157,32 +148,13 @@ export default function ConvolutionPage() {
         return () => window.removeEventListener("resize", update);
     }, []);
 
-    useEffect(() => {
-        const headerEl = headerRef.current;
-        const controlsEl = controlsRef.current;
-        if (!headerEl || !controlsEl) return;
-
-        const update = () => {
-            setHeaderH(headerEl.getBoundingClientRect().height);
-            setControlsH(controlsEl.getBoundingClientRect().height);
-        };
-
-        update();
-        const ro = new ResizeObserver(update);
-        ro.observe(headerEl);
-        ro.observe(controlsEl);
-        return () => ro.disconnect();
-    }, []);
-
-    // ==== Signal Plot Height ====
-    const bottomSafeHeight = convolutionConfig.layout.bottomSafeHeight;
-    const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
-    const availableHeight = Math.max(convolutionConfig.layout.minimumPlotAreaHeight, remainingHeight); //use highest value
+    // Plot heights are controlled directly by config. The page scrolls when the
+    // controls and two plots are taller than the available browser window.
     const signalPlotHeight = isMobile
         ? convolutionConfig.layout.mobilePlotHeight
         : isTablet
           ? convolutionConfig.layout.tabletPlotHeight
-          : Math.floor((availableHeight - gapBottom) / 2);
+          : convolutionConfig.layout.desktopPlotHeight;
 
     //tau = array that consist x-axis position of 1400 points; top plot; 1400 to have a better intergral approx
 	//tAxis = array that consist x-axis position of 700 points; bottom plot
@@ -663,10 +635,7 @@ export default function ConvolutionPage() {
     <ResponsiveLabPageShell
         title="Convolution"
         isMobile={isMobile}
-        headerRef={headerRef}
         mainStyle={{
-            height: useScrollableLayout ? "auto" : "100vh",
-            overflow: useScrollableLayout ? "auto" : "hidden",
             background: backgroundColor,
             fontSize: isMobile ? "0.9rem" : "1rem",
         }}
@@ -674,7 +643,6 @@ export default function ConvolutionPage() {
 
     {/* Control Panel */}
     <div
-        ref={controlsRef}
         style={{
             border: borderColor,
             borderRadius: 12,

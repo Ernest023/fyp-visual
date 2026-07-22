@@ -36,7 +36,7 @@ export const samplingConfig = {
     plotHeights: {
         mobile: 330,
         tablet: 355,
-        desktop: 365,
+        desktop: 300,
     },
     statusStyles: {
         nyquist: {

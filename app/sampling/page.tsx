@@ -781,10 +781,6 @@ export default function SamplingPage() {
                             <InlineMath
                                 math={String.raw`X_s(f)=\frac{1}{T_s}\sum_{k=-\infty}^{\infty}X(f-kf_s)`}
                             />
-                            {" · short ticks mark "}
-                            <InlineMath math="kf_s" />
-                            {" · red boundaries mark "}
-                            <InlineMath math="\pm f_s/2" />
                         </>
                     }
                     height={plotHeight}
