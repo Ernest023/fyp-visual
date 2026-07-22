@@ -2,6 +2,7 @@ import type { Data } from "plotly.js";
 import { makeStemTraces } from "@/components/visualization/SignalPlot";
 import { wrapPhase } from "@/features/frequency/frequencyMath";
 import type { SineComponent } from "@/features/frequency/types";
+import { theme } from "@/styles/theme";
 
 export type SineSpectrum = {
     frequencies: number[];
@@ -54,7 +55,7 @@ export function buildSineSpectrum(components: SineComponent[]): SineSpectrum {
 // Produces the paired magnitude and phase stem traces used by the page.
 export function buildSpectrumPlotTraces(spectrum: SineSpectrum): { magnitudeTraces: Data[]; phaseTraces: Data[] } {
     return {
-        magnitudeTraces: makeStemTraces(spectrum.frequencies, spectrum.magnitudes, "Magnitude spectrum", "rgba(37,99,235,0.95)"),
-        phaseTraces: makeStemTraces(spectrum.frequencies, spectrum.phases, "Phase spectrum", "rgba(249,115,22,0.95)"),
+        magnitudeTraces: makeStemTraces(spectrum.frequencies, spectrum.magnitudes, "Magnitude spectrum", theme.colors.outputSignal),
+        phaseTraces: makeStemTraces(spectrum.frequencies, spectrum.phases, "Phase spectrum", theme.colors.kernelSignal),
     };
 }

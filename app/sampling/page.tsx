@@ -17,9 +17,9 @@ import { samplingConfig } from "@/features/sampling/config";
 export default function SamplingPage() {
     // Responsive layout state determines the number of control and plot columns.
     const [viewportWidth, setViewportWidth] = useState<number>(samplingConfig.defaults.viewportWidth);
-    const isMobile = viewportWidth < samplingConfig.breakpoints.mobile;
-    const isTablet = viewportWidth >= samplingConfig.breakpoints.mobile && viewportWidth < samplingConfig.breakpoints.tablet;
-    const useSingleColumnPlots = viewportWidth < samplingConfig.breakpoints.tablet;
+    const isMobile = viewportWidth < theme.breakpoints.mobile;
+    const isTablet = viewportWidth >= theme.breakpoints.mobile && viewportWidth < theme.breakpoints.tablet;
+    const useSingleColumnPlots = viewportWidth < theme.breakpoints.tablet;
 
     // Mathematical parameters of x(t) and the sampler.
     const [amplitude, setAmplitude] = useState<number>(samplingConfig.defaults.amplitude);
@@ -47,9 +47,17 @@ export default function SamplingPage() {
         return () => window.removeEventListener("resize", updateViewport);
     }, []);
 
-    // All time-domain plots use this shared one-second observation window.
-    const timeMin = samplingConfig.timeDomain.min;
-    const timeMax = samplingConfig.timeDomain.max;
+    // Show a useful number of cycles at every selected signal frequency. All
+    // related time-domain plots share this range so visual comparisons remain valid.
+    const adaptiveHalfWindow = Math.min(
+        samplingConfig.timeDomain.maximumHalfWindow,
+        Math.max(
+            samplingConfig.timeDomain.minimumHalfWindow,
+            samplingConfig.timeDomain.visibleCycles / (2 * signalFrequency)
+        )
+    );
+    const timeMin = -adaptiveHalfWindow;
+    const timeMax = adaptiveHalfWindow;
 
     // Create a dense axis so the original and reconstructed curves look smooth.
     const continuousTimeAxis = useMemo(() => {
@@ -205,7 +213,7 @@ export default function SamplingPage() {
                 mode: "lines",
                 name: "Original signal",
                 line: {
-                    color: "rgba(34,197,94,0.95)",
+                    color: theme.colors.inputSignal,
                     width: 3,
                 },
             },
@@ -221,7 +229,7 @@ export default function SamplingPage() {
             mode: "lines",
             name: "Original signal",
             line: {
-                color: "rgba(34,197,94,0.42)",
+                color: theme.colors.inputSignalMuted,
                 width: 2,
                 dash: "dash",
             },
@@ -231,7 +239,7 @@ export default function SamplingPage() {
             sampledSignal.times,
             sampledSignal.values,
             "Samples",
-            "rgba(37,99,235,0.95)"
+            theme.colors.outputSignal
         );
 
         return [originalReference, ...sampleTraces];
@@ -251,7 +259,7 @@ export default function SamplingPage() {
                 mode: "lines",
                 name: "Original signal",
                 line: {
-                    color: "rgba(37,99,235,0.95)",
+                    color: theme.colors.inputSignal,
                     width: 3,
                     dash: "solid",
                 },
@@ -268,8 +276,8 @@ export default function SamplingPage() {
                 : "Sinc reconstruction",
             line: {
                 color: isAliasing
-                    ? "rgba(239,68,68,0.95)"
-                    : "rgba(34,197,94,0.95)",
+                    ? theme.colors.danger
+                    : theme.colors.outputSignal,
                 width: 2.5,
                 dash: "dash",
             },
@@ -285,7 +293,7 @@ export default function SamplingPage() {
                 showlegend: false,
                 hoverinfo: "skip",
                 line: {
-                    color: "rgba(239,68,68,0.22)",
+                    color: theme.colors.sampleStem,
                     width: 1.5,
                 },
             },
@@ -296,7 +304,7 @@ export default function SamplingPage() {
                 mode: "markers",
                 name: "Samples",
                 marker: {
-                    color: "rgba(220,38,38,1)",
+                    color: theme.colors.outputSignal,
                     size: 8,
                     line: {
                         color: "rgba(255,255,255,0.9)",
@@ -321,8 +329,8 @@ export default function SamplingPage() {
     const spectrumReplicaTraces = useMemo(() => {
         const replicaCount = samplingConfig.spectrum.replicaCount;
         const traces: Data[] = [];
-        const replicaColor = "rgba(37,99,235,0.78)";
-        const baseSpectrumColor = "rgba(124,58,237,1)";
+        const replicaColor = theme.colors.spectrumReplicaMuted;
+        const baseSpectrumColor = theme.colors.spectrumBase;
 
         for (
             let replicaIndex = -replicaCount;
@@ -393,7 +401,7 @@ export default function SamplingPage() {
                 showlegend: false,
                 hoverinfo: "skip",
                 line: {
-                    color: "rgba(15,23,42,0.62)",
+                    color: theme.colors.plotAnnotationMuted,
                     width: 2,
                     dash: "dot",
                 },
@@ -409,7 +417,7 @@ export default function SamplingPage() {
                 hoverinfo: "skip",
                 textposition: "top center",
                 textfont: {
-                    color: "rgba(15,23,42,0.82)",
+                    color: theme.colors.plotAnnotation,
                     size: 11,
                 },
             }
@@ -442,7 +450,7 @@ export default function SamplingPage() {
                 y0: 0,
                 y1: Math.max(amplitude / 2 + 0.2, 1),
                 line: {
-                    color: "rgba(239,68,68,0.75)",
+                    color: theme.colors.danger,
                     width: 2,
                     dash: "dot",
                 },
@@ -454,7 +462,7 @@ export default function SamplingPage() {
                 y0: 0,
                 y1: Math.max(amplitude / 2 + 0.2, 1),
                 line: {
-                    color: "rgba(239,68,68,0.75)",
+                    color: theme.colors.danger,
                     width: 2,
                     dash: "dot",
                 },

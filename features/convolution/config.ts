@@ -28,11 +28,6 @@ export const convolutionConfig = {
         amplitude: { min: -10, max: 10, step: 0.01 },
         drawingAmplitude: { min: -10, max: 10, step: 0.01 },
     },
-    breakpoints: {
-        mobile: 600,
-        tablet: 1100,
-        compactDesktop: 1400,
-    },
     sampling: {
         densityMultiplier: 1,
         continuousInputPoints: 1400,

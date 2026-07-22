@@ -1,3 +1,5 @@
+import { theme } from "@/styles/theme";
+
 // Static defaults, control limits, numerical accuracy, and display settings for
 // the sampling and aliasing laboratory.
 export const samplingConfig = {
@@ -15,9 +17,10 @@ export const samplingConfig = {
         phase: { min: -Math.PI, max: Math.PI, step: 0.01 },
     },
     timeDomain: {
-        min: -0.5,
-        max: 0.5,
         pointCount: 5000,
+        visibleCycles: 4,
+        minimumHalfWindow: 0.25,
+        maximumHalfWindow: 2,
     },
     reconstruction: {
         interpolationPadding: 128,
@@ -30,10 +33,6 @@ export const samplingConfig = {
         minimumFrequencyLimit: 20,
         frequencyPadding: 2,
     },
-    breakpoints: {
-        mobile: 600,
-        tablet: 1024,
-    },
     plotHeights: {
         mobile: 330,
         tablet: 355,
@@ -41,19 +40,19 @@ export const samplingConfig = {
     },
     statusStyles: {
         nyquist: {
-            color: "#eab308",
-            background: "rgba(234,179,8,0.10)",
-            border: "1px solid rgba(234,179,8,0.55)",
+            color: theme.colors.warning,
+            background: theme.colors.warningMuted,
+            border: `1px solid ${theme.colors.warning}`,
         },
         safe: {
-            color: "#22c55e",
-            background: "rgba(34,197,94,0.10)",
-            border: "1px solid rgba(34,197,94,0.55)",
+            color: theme.colors.inputSignal,
+            background: theme.colors.inputSignalSurface,
+            border: `1px solid ${theme.colors.inputSignal}`,
         },
         aliasing: {
-            color: "#ef4444",
-            background: "rgba(239,68,68,0.10)",
-            border: "1px solid rgba(239,68,68,0.55)",
+            color: theme.colors.danger,
+            background: theme.colors.dangerSurface,
+            border: `1px solid ${theme.colors.danger}`,
         },
     },
 } as const;

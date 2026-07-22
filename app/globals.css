@@ -201,7 +201,7 @@ input[type="range"] {
   font-weight: 850;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1024px) {
   .home-shell {
     width: min(760px, calc(100% - 32px));
     align-content: start;
@@ -220,7 +220,7 @@ input[type="range"] {
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .home-shell {
     width: calc(100% - 24px);
     padding: 12px 0;

@@ -16,10 +16,11 @@ import { InlineMath } from "react-katex";
 import { getPresetValue, getDrawnValue } from "@/library/signalEvaluator";
 import type { SignalSource } from "@/library/types";
 import { backgroundColor, borderColor, convolutionConfig, defaultHSignal, defaultXSignal, gapBottom } from "@/features/convolution/config";
-import { computeConvolutionSamples } from "@/features/convolution/convolutionEngine";
+import { computeConvolutionSamples, createCachedSignalEvaluator } from "@/features/convolution/convolutionEngine";
 import ConvolutionStageToolbar, { type TimeMode } from "@/features/convolution/components/ConvolutionStageToolbar";
 import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
 import SignalSourceEditor from "@/features/convolution/components/SignalSourceEditor";
+import { theme } from "@/styles/theme";
 
 // Sampling density multiplier used by the continuous-time numerical integral.
 const spm = convolutionConfig.sampling.densityMultiplier;
@@ -32,10 +33,10 @@ export default function ConvolutionPage() {
 
     // Responsive layout modes
     const [viewportWidth, setViewportWidth] = useState<number>(convolutionConfig.defaults.viewportWidth);
-    const isMobile = viewportWidth < convolutionConfig.breakpoints.mobile;
-    const isTablet = viewportWidth >= convolutionConfig.breakpoints.mobile && viewportWidth < convolutionConfig.breakpoints.tablet;
-    const isMobileM = viewportWidth < convolutionConfig.breakpoints.compactDesktop;
-    const useScrollableLayout = viewportWidth < convolutionConfig.breakpoints.tablet;
+    const isMobile = viewportWidth < theme.breakpoints.mobile;
+    const isTablet = viewportWidth >= theme.breakpoints.mobile && viewportWidth < theme.breakpoints.tablet;
+    const isMobileM = viewportWidth < theme.breakpoints.desktop;
+    const useScrollableLayout = viewportWidth < theme.breakpoints.tablet;
 
     useEffect(() => {
         const update = () => setViewportWidth(window.innerWidth);
@@ -294,6 +295,16 @@ export default function ConvolutionPage() {
         return 0;
     }, [Ah, hAmp, hDrawn, hExpr, hExprFn, hInput, hSource, hWidth, isDiscrete, tau]);
 
+    // Integer shifts repeat heavily during discrete convolution, so reuse exact
+    // h[n] evaluations. Continuous positions remain direct to avoid a very large cache.
+    const evaluateHForConvolution = useMemo(
+        () =>
+            isDiscrete
+                ? createCachedSignalEvaluator(evaluateHSignal)
+                : evaluateHSignal,
+        [evaluateHSignal, isDiscrete]
+    );
+
     // create y-axis point; original unshifted signals; 
     // CT: x(t0) ; DT: x[n0]
     // tau = x-positions; xSamples = y-values of x at those positions
@@ -303,13 +314,13 @@ export default function ConvolutionPage() {
 
     // CT: h(t0 - τ) ; DT: h[n0 - k]
     const hFlippedSamples = useMemo(() => {
-        return tau.map((v) => evaluateHSignal(t0 - v));
-    }, [evaluateHSignal, t0, tau]);
+        return tau.map((v) => evaluateHForConvolution(t0 - v));
+    }, [evaluateHForConvolution, t0, tau]);
 
     // 
     const hShiftedNotFlippedSamples = useMemo(() => {
-        return tau.map((v) => evaluateHSignal(v - t0));
-    }, [evaluateHSignal, t0, tau]);
+        return tau.map((v) => evaluateHForConvolution(v - t0));
+    }, [evaluateHForConvolution, t0, tau]);
 
     // h signal flipped state
     const [isHFlipped, setIsHFlipped] = useState<boolean>(convolutionConfig.defaults.isHFlipped);
@@ -337,10 +348,10 @@ export default function ConvolutionPage() {
             tAxis,
             tau,
             dt,
-            evaluateXSignal,
-            evaluateHSignal,
+            xSamples,
+            evaluateHSignal: evaluateHForConvolution,
         });
-    }, [dt, evaluateHSignal, evaluateXSignal, isDiscrete, isHFlipped, tAxis, tau]);
+    }, [dt, evaluateHForConvolution, isDiscrete, isHFlipped, tAxis, tau, xSamples]);
 
     // Current output value at slider
     const yAtT0 = useMemo(() => {
@@ -382,21 +393,29 @@ export default function ConvolutionPage() {
         ? (isHFlipped ? "n-k" : "k-n")
         : (isHFlipped ? "t-τ" : "τ-t");
 
+    // Rectangular and unit-step presets contain true jump discontinuities.
+    // Plotly's step-line interpolation draws those jumps vertically instead of
+    // joining adjacent numerical samples with a short diagonal segment.
+    const xUsesStepInterpolation =
+        xSource === "preset" && (xInput === "rect" || xInput === "step");
+    const hUsesStepInterpolation =
+        hSource === "preset" && (hInput === "rect" || hInput === "step");
+
     // plot data
     const inputTraces = useMemo(() => {
     if (isDiscrete) {
         return [
-        ...makeStemTraces(tau, xSamples, xDisplayLabel, "rgba(34,197,94,0.95)"),
-        ...makeStemTraces(tau, hDisplaySamples, hDisplayLabel, "rgba(249,115,22,0.95)"),
+        ...makeStemTraces(tau, xSamples, xDisplayLabel, theme.colors.inputSignal),
+        ...makeStemTraces(tau, hDisplaySamples, hDisplayLabel, theme.colors.kernelSignal),
         {
                 x: tau,
                 y: productSamples,
                 type: isDiscrete ? "bar" : "scatter",
                 mode: isDiscrete ? "" : "lines",
                 name: xDisplayLabel + "·" + hDisplayLabel,
-                marker: {color: "rgba(255,0,0,0.25)"},
+                marker: {color: theme.colors.dangerMuted},
                 fill : "tozeroy",
-                fillcolor: "rgba(255,0,0,0.25)",
+                fillcolor: theme.colors.dangerMuted,
                 //hoverinfo: "skip",
         },
         
@@ -410,7 +429,11 @@ export default function ConvolutionPage() {
             type: "scatter",
             mode: "lines",
             name: xDisplayLabel,
-            marker: {color: "rgba(34,197,94,0.95)"},
+            line: {
+                color: theme.colors.inputSignal,
+                width: 3,
+                shape: xUsesStepInterpolation ? "hv" : "linear",
+            },
         },
         {
             x: tau,
@@ -418,7 +441,11 @@ export default function ConvolutionPage() {
             type: "scatter",
             mode: "lines",
             name: hDisplayLabel,
-            marker: { color: "rgba(249,115,22,0.95)" },
+            line: {
+                color: theme.colors.kernelSignal,
+                width: 3,
+                shape: hUsesStepInterpolation ? "hv" : "linear",
+            },
         },
         {
             x: tau,
@@ -426,13 +453,30 @@ export default function ConvolutionPage() {
             type: "scatter",
             mode: "lines",
             name: xDisplayLabel + "·" + hDisplayLabel,
-            marker: {color: "rgba(255,0,0,0.25)"},
+            line: {
+                color: theme.colors.dangerMuted,
+                width: 2,
+                shape:
+                    xUsesStepInterpolation || hUsesStepInterpolation
+                        ? "hv"
+                        : "linear",
+            },
             fill : "tozeroy",
-            fillcolor: "rgba(255,0,0,0.25)",
+            fillcolor: theme.colors.dangerMuted,
             hoverinfo: "skip",
         },
     ];
-    }, [hDisplayLabel, hDisplaySamples, isDiscrete, productSamples, tau, xDisplayLabel, xSamples]);
+    }, [
+        hDisplayLabel,
+        hDisplaySamples,
+        hUsesStepInterpolation,
+        isDiscrete,
+        productSamples,
+        tau,
+        xDisplayLabel,
+        xSamples,
+        xUsesStepInterpolation,
+    ]);
 
     // ===== output plot y-range =====
     // Lowest visible output value, but include 0 so the axis still shows the baseline
@@ -453,14 +497,14 @@ export default function ConvolutionPage() {
     const outputTraces = useMemo(() => {
         if (isDiscrete) {
             return [
-                ...makeStemTraces(tAxis, yReveal, "y[n]", "rgba(53, 53, 254, 0.95)"),
+                ...makeStemTraces(tAxis, yReveal, "y[n]", theme.colors.outputSignal),
                 {
                     x: [t0],
                     y: [yAtT0],
                     type: "scatter",
                     mode: "markers",
                     name: "current y[n]",
-                    marker: { color: "rgba(220,38,38,0.95)", size: 9 },
+                    marker: { color: theme.colors.danger, size: 9 },
                 },
                 {
                     x: [t0, t0],
@@ -468,7 +512,7 @@ export default function ConvolutionPage() {
                     type: "scatter",
                     mode: "lines",
                     name: "current n",
-                    line: { color: "rgba(220,38,38,0.85)", width: 2, dash: "dot" },
+                    line: { color: theme.colors.danger, width: 2, dash: "dot" },
                     hoverinfo: "skip",
                 },
             ];
@@ -480,7 +524,7 @@ export default function ConvolutionPage() {
                 type: "scatter",
                 mode: "lines",
                 name: "y(t)",
-                line: { color: "rgba(37,99,235,0.95)", width: 3 },
+                line: { color: theme.colors.outputSignal, width: 3 },
             },
             {
                 x: [t0],
@@ -488,7 +532,7 @@ export default function ConvolutionPage() {
                 type: "scatter",
                 mode: "markers",
                 name: "current y(t)",
-                marker: { color: "rgba(220,38,38,0.95)", size: 9 },
+                marker: { color: theme.colors.danger, size: 9 },
             },
             {
                 x: [t0, t0],
@@ -496,7 +540,7 @@ export default function ConvolutionPage() {
                 type: "scatter",
                 mode: "lines",
                 name: "current t",
-                line: { color: "rgba(220,38,38,0.85)", width: 2, dash: "dot" },
+                line: { color: theme.colors.danger, width: 2, dash: "dot" },
                 hoverinfo: "skip",
             },
         ];

@@ -11,7 +11,7 @@ import { makeImpulseTraces } from "@/features/frequency/frequencyPlot";
 import FourierPairLabel from "@/features/frequency/FourierPairLabel";
 import { buildSineSpectrum, buildSpectrumPlotTraces } from "@/features/frequency/spectrumPlotBuilder";
 import TransformPairCatalogue from "@/features/frequency/components/TransformPairCatalogue";
-import { pairParameterLabel, showParameterSlider } from "@/features/frequency/transformPairCatalogue";
+import { getTransformPairDomains, pairParameterLabel, showParameterSlider } from "@/features/frequency/transformPairCatalogue";
 import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
 import EducationalExplanationCard from "@/components/education/EducationalExplanationCard";
 import { createInitialComponentTexts, frequencyConfig } from "@/features/frequency/config";
@@ -22,9 +22,9 @@ const componentColors = frequencyConfig.componentColors;
 export default function FourierPage() {
     // Responsive layout state controls how the editors and plots are arranged.
     const [viewportWidth, setViewportWidth] = useState<number>(frequencyConfig.defaults.viewportWidth);
-    const isMobile = viewportWidth < frequencyConfig.breakpoints.mobile;
-    const isTablet = viewportWidth >= frequencyConfig.breakpoints.mobile && viewportWidth < frequencyConfig.breakpoints.tablet;
-    const useSingleColumnPlots = viewportWidth < frequencyConfig.breakpoints.tablet;
+    const isMobile = viewportWidth < theme.breakpoints.mobile;
+    const isTablet = viewportWidth >= theme.breakpoints.mobile && viewportWidth < theme.breakpoints.tablet;
+    const useSingleColumnPlots = viewportWidth < theme.breakpoints.tablet;
 
     // The page has two learning activities: building a signal from sine waves
     // and browsing common Fourier transform pairs.
@@ -59,9 +59,23 @@ export default function FourierPage() {
 
     // Shared time axis used by every sine component and their combined signal.
     const tAxis = useMemo(() => {
-        const { min, max, points } = frequencyConfig.axes.signalTime;
-        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
-    }, []);
+        const { cycles, minimumHalfWindow, maximumHalfWindow } =
+            frequencyConfig.axes.adaptiveSignalTime;
+        const minimumFrequency = Math.max(
+            Math.min(...components.map((component) => Math.abs(component.frequency))),
+            frequencyConfig.limits.frequency.min
+        );
+        const halfWindow = Math.min(
+            maximumHalfWindow,
+            Math.max(minimumHalfWindow, cycles / (2 * minimumFrequency))
+        );
+        const points = frequencyConfig.axes.signalTime.points;
+
+        return Array.from(
+            { length: points },
+            (_, i) => -halfWindow + (2 * halfWindow * i) / (points - 1)
+        );
+    }, [components]);
 
     // Generate one time-domain Plotly trace for each editable sine component.
     const componentTraces = useMemo(() => {
@@ -177,7 +191,7 @@ export default function FourierPage() {
             type: "scatter",
             mode: "lines",
             name: "x(t)",
-            line: { color: "rgba(34,197,94,0.95)", width: 3 },
+            line: { color: theme.colors.inputSignal, width: 3 },
         },
     ];
 
@@ -285,15 +299,30 @@ export default function FourierPage() {
     ];
 
     // Dense, shared axes for plotting the transform-pair catalogue examples.
+    const pairDomains = useMemo(
+        () => getTransformPairDomains(pairMode, pairWidth),
+        [pairMode, pairWidth]
+    );
+
     const pairTimeAxis = useMemo(() => {
-        const { min, max, points } = frequencyConfig.axes.pairTime;
-        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
-    }, []);
+        const points = frequencyConfig.axes.pairTime.points;
+        return Array.from(
+            { length: points },
+            (_, i) =>
+                -pairDomains.timeLimit +
+                (2 * pairDomains.timeLimit * i) / (points - 1)
+        );
+    }, [pairDomains.timeLimit]);
 
     const pairFreqAxis = useMemo(() => {
-        const { min, max, points } = frequencyConfig.axes.pairFrequency;
-        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
-    }, []);
+        const points = frequencyConfig.axes.pairFrequency.points;
+        return Array.from(
+            { length: points },
+            (_, i) =>
+                -pairDomains.frequencyLimit +
+                (2 * pairDomains.frequencyLimit * i) / (points - 1)
+        );
+    }, [pairDomains.frequencyLimit]);
 
     // Catalogue data for each transform pair. Every entry defines its displayed
     // equation, labels, and sampled time- and frequency-domain functions.
@@ -347,7 +376,7 @@ export default function FourierPage() {
         timeImpulseTraces: makeImpulseTraces(
             [{ x: 0, height: 1 }],
             "δ(t)",
-            "rgba(34,197,94,0.95)"
+            theme.colors.inputSignal
         ),
 
         timeYRange: [0, 1.25],
@@ -492,28 +521,49 @@ export default function FourierPage() {
             timeSamples: pairTimeAxis.map(() => 0),
             freqSamples: pairFreqAxis.map(() => 0),
             timeImpulseTraces: makeImpulseTraces(
-                Array.from({ length: 13 }, (_, i) => {
-                    const n = i - 6;
+                Array.from(
+                    {
+                        length:
+                            2 * Math.floor(pairDomains.timeLimit / pairWidth) + 1,
+                    },
+                    (_, i) => {
+                    const n = i - Math.floor(pairDomains.timeLimit / pairWidth);
                     return {
                         x: n * pairWidth,
                         height: 1,
                     };
-                }).filter((p) => p.x >= -6 && p.x <= 6),
+                }).filter(
+                    (p) =>
+                        p.x >= -pairDomains.timeLimit &&
+                        p.x <= pairDomains.timeLimit
+                ),
                 "Impulse train",
-                "rgba(34,197,94,0.95)"
+                theme.colors.inputSignal
             ),
 
             freqImpulseTraces: makeImpulseTraces(
-                Array.from({ length: 17 }, (_, i) => {
-                    const n = i - 8;
+                Array.from({
+                    length:
+                        2 *
+                            Math.floor(
+                                pairDomains.frequencyLimit / (1 / pairWidth)
+                            ) +
+                        1,
+                }, (_, i) => {
                     const f0 = 1 / pairWidth;
+                    const n =
+                        i - Math.floor(pairDomains.frequencyLimit / f0);
                     return {
                         x: n * f0,
                         height: 1 / pairWidth,
                     };
-                }).filter((p) => p.x >= -10 && p.x <= 10),
+                }).filter(
+                    (p) =>
+                        p.x >= -pairDomains.frequencyLimit &&
+                        p.x <= pairDomains.frequencyLimit
+                ),
                 "Impulse train spectrum",
-                "rgba(37,99,235,0.95)"
+                theme.colors.outputSignal
             ),
 
             timeYRange: [0, 1.25],
@@ -535,7 +585,7 @@ export default function FourierPage() {
             type: "scatter",
             mode: "lines",
             name: selectedPair.timeName,
-            line: { color: "rgba(34,197,94,0.95)", width: 3 },
+            line: { color: theme.colors.inputSignal, width: 3 },
         },
     ];
 
@@ -548,7 +598,7 @@ export default function FourierPage() {
             type: "scatter",
             mode: "lines",
             name: selectedPair.freqName,
-            line: { color: "rgba(37,99,235,0.95)", width: 3 },
+            line: { color: theme.colors.outputSignal, width: 3 },
         },
     ];
 
@@ -956,7 +1006,7 @@ export default function FourierPage() {
                         traces={pairTimeTraces}
                         xLabel="t"
                         yLabel="Amplitude"
-                        xRange={[frequencyConfig.axes.pairTime.min, frequencyConfig.axes.pairTime.max]}
+                        xRange={[-pairDomains.timeLimit, pairDomains.timeLimit]}
                         yRange={selectedPair.timeYRange}
                         compact={isMobile}
                         compactM={isTablet}
@@ -968,7 +1018,7 @@ export default function FourierPage() {
                         traces={pairFreqTraces}
                         xLabel="f"
                         yLabel="Magnitude"
-                        xRange={[frequencyConfig.axes.pairFrequency.min, frequencyConfig.axes.pairFrequency.max]}
+                        xRange={[-pairDomains.frequencyLimit, pairDomains.frequencyLimit]}
                         yRange={selectedPair.freqYRange}
                         compact={isMobile}
                         compactM={isTablet}

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import React from "react";
 import type { Data, Layout } from "plotly.js";
+import { theme } from "@/styles/theme";
 //npm install react-plotly.js plotly.js
 //npm install -D @types/react-plotly.js @types/plotly.js
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -85,9 +86,9 @@ export default function SignalPlot({
 
   const plotHeight = Math.max(160, height - pad * 2 - titleH - gap);
 
-  const axisColor = "rgba(231, 231, 231, 0.85)"; // axis line + tick labels
-  const gridColor = "rgba(0,0,0,0.18)"; // grid lines
-  const zeroColor = "rgba(0, 0, 0, 0.38)"; // x=0 / y=0 line
+  const axisColor = theme.colors.plotAxis;
+  const gridColor = theme.colors.gridLine;
+  const zeroColor = theme.colors.zeroLine;
 
   return (
     <div
@@ -114,6 +115,7 @@ export default function SignalPlot({
               fontSize: 13,
               opacity: 0.92,
               whiteSpace: "nowrap",
+              overflowX: "auto",
               fontFamily: "ui-serif, Times New Roman, serif",
             }}
           >
@@ -139,6 +141,7 @@ export default function SignalPlot({
 
           xaxis: {
             range: xRange,
+            fixedrange: true,
 
             zeroline: true,
             zerolinecolor: zeroColor,
@@ -164,6 +167,7 @@ export default function SignalPlot({
 
           yaxis: {
             range: yRange,
+            fixedrange: true,
 
             zeroline: true,
             zerolinecolor: zeroColor,

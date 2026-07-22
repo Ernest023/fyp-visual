@@ -1,10 +1,11 @@
 import type { Data } from "plotly.js";
+import { theme } from "@/styles/theme";
 
 // Builds Plotly stem and marker traces for Fourier-domain impulses.
 export function makeImpulseTraces(
     impulses: { x: number; height: number; label?: string }[],
     name: string,
-    color = "rgba(37,99,235,0.95)"
+    color: string = theme.colors.outputSignal
 ): Data[] {
     const stemX: Array<number | null> = [];
     const stemY: Array<number | null> = [];

@@ -1,4 +1,5 @@
 import type { PageMode, PairMode, SineComponent } from "@/features/frequency/types";
+import { theme } from "@/styles/theme";
 
 // Static defaults and limits for the frequency-domain laboratory. Calculated
 // spectra and Plotly traces remain in their dedicated builder modules.
@@ -22,30 +23,18 @@ export const frequencyConfig = {
         pairParameter: { min: 0.2, max: 10, step: 0.01 },
     },
     axes: {
-        signalTime: { min: -2, max: 2, points: 1600 },
+        signalTime: { points: 1600 },
+        adaptiveSignalTime: { cycles: 4, minimumHalfWindow: 0.5, maximumHalfWindow: 4 },
         pairTime: { min: -6, max: 6, points: 6000 },
         pairFrequency: { min: -10, max: 10, points: 6000 },
         spectrumPadding: 1,
-    },
-    breakpoints: {
-        mobile: 600,
-        tablet: 1024,
     },
     plotHeights: {
         mobile: 315,
         tablet: 350,
         desktop: 270,
     },
-    componentColors: [
-        "#22c55e",
-        "#3b82f6",
-        "#f97316",
-        "#a855f7",
-        "#ef4444",
-        "#14b8a6",
-        "#eab308",
-        "#ec4899",
-    ],
+    componentColors: theme.chartSeries,
 } as const;
 
 export function createInitialComponentTexts() {
