@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 // useState - returns an array with two elements: the current state value and a function to update that value
 // useMemo - It runs the function only when one of its dependencies changes, otherwise, it reuses the last calculated
 // useRef - It returns a mutable object with a single current property, which you can read from and write to directly
 // useEffect - It runs the provided function after the component has rendered and committed to the screen
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PresetInput, PRESETS } from "@/library/signal";
-import SignalSourcePreset, {ButtonToggle, TextBoxSliders, SignalSourceSelection, TSliders} from "@/components/controls/ControlPanelSource"
+import SignalSourcePreset, { TextBoxSliders, TSliders } from "@/components/controls/ControlPanelSource"
 import SignalPlot, {makeStemTraces} from "@/components/visualization/SignalPlot";
 import CustomExpressionInput from "@/components/controls/CustomExpressionInput";
 import {buildExpressionEvaluator,validateExpression} from "@/library/customExpression";
@@ -16,25 +15,27 @@ import DrawSignalPanel from "@/components/drawing/DrawSignalPanel";
 import { InlineMath } from "react-katex";
 import { getPresetValue, getDrawnValue } from "@/library/signalEvaluator";
 import type { SignalSource } from "@/library/types";
-import { backgroundColor, borderColor, defaultHSignal, defaultXSignal, gapBottom } from "@/features/convolution/config";
+import { backgroundColor, borderColor, convolutionConfig, defaultHSignal, defaultXSignal, gapBottom } from "@/features/convolution/config";
+import { computeConvolutionSamples } from "@/features/convolution/convolutionEngine";
+import ConvolutionStageToolbar, { type TimeMode } from "@/features/convolution/components/ConvolutionStageToolbar";
+import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
+import SignalSourceEditor from "@/features/convolution/components/SignalSourceEditor";
 
 // Sampling density multiplier used by the continuous-time numerical integral.
-const spm = 1;
+const spm = convolutionConfig.sampling.densityMultiplier;
 const spmfix = spm - 1;
 
 export default function ConvolutionPage() {
-    type TimeMode = "continuous" | "discrete";
-
     // ===== time mode ===== isDiscrete default at continuous
-    const [timeMode, setTimeMode] = useState<TimeMode>("continuous");
+    const [timeMode, setTimeMode] = useState<TimeMode>(convolutionConfig.defaults.timeMode);
     const isDiscrete = timeMode === "discrete";
 
     // Responsive layout modes
-    const [viewportWidth, setViewportWidth] = useState(1280);
-    const isMobile = viewportWidth < 600;
-    const isTablet = viewportWidth >= 600 && viewportWidth < 1100;
-    const isMobileM = viewportWidth < 1400;
-    const useScrollableLayout = viewportWidth < 1100;
+    const [viewportWidth, setViewportWidth] = useState<number>(convolutionConfig.defaults.viewportWidth);
+    const isMobile = viewportWidth < convolutionConfig.breakpoints.mobile;
+    const isTablet = viewportWidth >= convolutionConfig.breakpoints.mobile && viewportWidth < convolutionConfig.breakpoints.tablet;
+    const isMobileM = viewportWidth < convolutionConfig.breakpoints.compactDesktop;
+    const useScrollableLayout = viewportWidth < convolutionConfig.breakpoints.tablet;
 
     useEffect(() => {
         const update = () => setViewportWidth(window.innerWidth);
@@ -64,8 +65,12 @@ export default function ConvolutionPage() {
     const [hAmp, setHAmp] = useState<number>(defaultHSignal.amplitude);
 
     // ===== width range ====
-    const WidthMinC = 0.2, WidthMaxC = 3, WidthStepC = 0.01;
-    const WidthMinD = 1, WidthMaxD = 20, WidthStepD = 1;
+    const WidthMinC = convolutionConfig.controls.continuousWidth.min;
+    const WidthMaxC = convolutionConfig.controls.continuousWidth.max;
+    const WidthStepC = convolutionConfig.controls.continuousWidth.step;
+    const WidthMinD = convolutionConfig.controls.discreteWidth.min;
+    const WidthMaxD = convolutionConfig.controls.discreteWidth.max;
+    const WidthStepD = convolutionConfig.controls.discreteWidth.step;
 
     // ===== set width range according to mode =====
     const WidthMin = isDiscrete ? WidthMinD : WidthMinC;
@@ -73,7 +78,9 @@ export default function ConvolutionPage() {
     const WidthStep = isDiscrete ? WidthStepD : WidthStepC;
 
     // ===== Amplitude range ====
-    const AmpMin = -10, AmpMax = 10, AmpStep = 0.01;
+    const AmpMin = convolutionConfig.controls.amplitude.min;
+    const AmpMax = convolutionConfig.controls.amplitude.max;
+    const AmpStep = convolutionConfig.controls.amplitude.step;
 
     // ===== Text box =====
     const [xWidthText, setXWidthText] = useState<string>(isDiscrete ? String(Math.round(xWidth)) : xWidth.toFixed(2));
@@ -133,7 +140,7 @@ export default function ConvolutionPage() {
 
     // ==== screen height ====
     // set inital value 
-    const [vh, setVh] = useState<number>(800);
+    const [vh, setVh] = useState<number>(convolutionConfig.layout.initialViewportHeight);
     // ref measured heights
     const headerRef = useRef<HTMLDivElement | null>(null);
     const controlsRef = useRef<HTMLDivElement | null>(null);
@@ -167,13 +174,13 @@ export default function ConvolutionPage() {
     }, []);
 
     // ==== Signal Plot Height ====
-    const bottomSafeHeight = 46;
+    const bottomSafeHeight = convolutionConfig.layout.bottomSafeHeight;
     const remainingHeight = vh - headerH - controlsH - gapBottom * 2 - bottomSafeHeight;
-    const availableHeight = Math.max(240, remainingHeight); //use highest value
+    const availableHeight = Math.max(convolutionConfig.layout.minimumPlotAreaHeight, remainingHeight); //use highest value
     const signalPlotHeight = isMobile
-        ? 330
+        ? convolutionConfig.layout.mobilePlotHeight
         : isTablet
-          ? 350
+          ? convolutionConfig.layout.tabletPlotHeight
           : Math.floor((availableHeight - gapBottom) / 2);
 
     //tau = array that consist x-axis position of 1400 points; top plot; 1400 to have a better intergral approx
@@ -184,28 +191,28 @@ export default function ConvolutionPage() {
     const { tau, tAxis, dt, tMin, tMax } = useMemo(() => {
     if (!isDiscrete) {
         if (xSource === "expression" || hSource === "expression") {
-            const domain = 30;
-            const tau = Array.from({ length: 1400 * spm }, (_, i) =>
-                -domain + (2 * domain * i) / (1399 * spm + spmfix)
+            const domain = convolutionConfig.sampling.fixedContinuousDomain;
+            const tau = Array.from({ length: convolutionConfig.sampling.continuousInputPoints * spm }, (_, i) =>
+                -domain + (2 * domain * i) / ((convolutionConfig.sampling.continuousInputPoints - 1) * spm + spmfix)
             );
-            const tAxis = Array.from({ length: 700 * spm }, (_, i) =>
-                -domain + (2 * domain * i) / (699 * spm + spmfix)
+            const tAxis = Array.from({ length: convolutionConfig.sampling.continuousOutputPoints * spm }, (_, i) =>
+                -domain + (2 * domain * i) / ((convolutionConfig.sampling.continuousOutputPoints - 1) * spm + spmfix)
             );
             const dt = tau[1] - tau[0];
             return { tau, tAxis, dt, tMin: -domain, tMax: domain };
         }
-        const base = 2;
-        const scale = Math.max(1, xWidth + hWidth + 0.5);
+        const base = convolutionConfig.sampling.continuousBaseDomain;
+        const scale = Math.max(1, xWidth + hWidth + convolutionConfig.sampling.continuousDomainPadding);
         const domain = base * scale;
         // Creates 1400 evenly spaced points from -domain to +domain
-        const tau = Array.from({ length: 1400 * spm }, (_, i) => -domain + (2 * domain * i) / (1399 * spm + spmfix));
-        const tAxis = Array.from({ length: 700 * spm }, (_, i) => -domain + (2 * domain * i) / (699 * spm + spmfix));
+        const tau = Array.from({ length: convolutionConfig.sampling.continuousInputPoints * spm }, (_, i) => -domain + (2 * domain * i) / ((convolutionConfig.sampling.continuousInputPoints - 1) * spm + spmfix));
+        const tAxis = Array.from({ length: convolutionConfig.sampling.continuousOutputPoints * spm }, (_, i) => -domain + (2 * domain * i) / ((convolutionConfig.sampling.continuousOutputPoints - 1) * spm + spmfix));
         // sample step
         const dt = tau[1] - tau[0];
         return { tau, tAxis, dt, tMin: -domain, tMax: domain };
     }
         if (xSource === "expression" || hSource === "expression") {
-            const nMax = 60;
+            const nMax = convolutionConfig.sampling.fixedDiscreteIndex;
 
             const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
             const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
@@ -214,7 +221,10 @@ export default function ConvolutionPage() {
         }
         const WxR = Math.round(xWidth);
         const WhR = Math.round(hWidth);
-        const nMax = Math.max(40, WxR + WhR + 6);
+        const nMax = Math.max(
+            convolutionConfig.sampling.minimumDiscreteIndex,
+            WxR + WhR + convolutionConfig.sampling.discreteDomainPadding
+        );
         // Creates min 12 * 2  + 1 evenly spaced points
         const tau = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
         const tAxis = Array.from({ length: 2 * nMax + 1 }, (_, i) => i - nMax);
@@ -223,7 +233,7 @@ export default function ConvolutionPage() {
     }, [isDiscrete, xSource, hSource, xWidth, hWidth]);
 
     // Current t slider position/value
-    const [t0, setT0] = useState<number>(-2.5);
+    const [t0, setT0] = useState<number>(convolutionConfig.defaults.slidePosition);
 
     useEffect(() => {
     setT0((prev) => Math.max(tMin, Math.min(tMax, prev)));
@@ -243,8 +253,12 @@ export default function ConvolutionPage() {
     const [AxText, setAxText] = useState("1.00");
     const [AhText, setAhText] = useState("1.00");
 
-    const AxMin = -10, AxMax = 10, AxStep = 0.01;
-    const AhMin = -10, AhMax = 10, AhStep = 0.01;
+    const AxMin = convolutionConfig.controls.drawingAmplitude.min;
+    const AxMax = convolutionConfig.controls.drawingAmplitude.max;
+    const AxStep = convolutionConfig.controls.drawingAmplitude.step;
+    const AhMin = convolutionConfig.controls.drawingAmplitude.min;
+    const AhMax = convolutionConfig.controls.drawingAmplitude.max;
+    const AhStep = convolutionConfig.controls.drawingAmplitude.step;
 
     useEffect(() => {
         setXDrawn((prev) => (prev.length === tau.length ? prev : Array(tau.length).fill(0)));
@@ -298,7 +312,7 @@ export default function ConvolutionPage() {
     }, [evaluateHSignal, t0, tau]);
 
     // h signal flipped state
-    const [isHFlipped, setIsHFlipped] = useState(false);
+    const [isHFlipped, setIsHFlipped] = useState<boolean>(convolutionConfig.defaults.isHFlipped);
 
     // h signal flipped and orginal 
     const hDisplaySamples = useMemo(() => {
@@ -317,40 +331,14 @@ export default function ConvolutionPage() {
     // one tiny slice contributes: x(τ) h(t - τ) × dt
     // full integral is approximated by summing all those slices: y(t) ≈ Σ [x(τ_i) h(t - τ_i)] × dt
     const ySamples = useMemo(() => {
-        if (!isDiscrete) {
-            return tAxis.map((t) => {
-                let sum = 0;
-                
-                //xVal * hVal = product height at one sampled point
-                //sum = total of all sampled heights
-                //sum * dt = approximate area under the product curve
-                for (let i = 0; i < tau.length; i++) {
-                    const tauVal = tau[i];
-                    const xVal = evaluateXSignal(tauVal);
-
-                    const hVal = isHFlipped
-                        ? evaluateHSignal(t - tauVal)  // convolution
-                        : evaluateHSignal(tauVal - t);  // unflipped shifted
-
-                    sum += xVal * hVal;
-                }
-                // Multiply by dt to convert the sampled sum into an approximation of the continuous integral.
-                return sum * dt;
-            });
-        }
-
-        return tAxis.map((n) => {
-            let sum = 0;
-            for (let i = 0; i < tau.length; i++) {
-            const k = tau[i];
-            const xVal = evaluateXSignal(k);
-
-            const hVal = isHFlipped
-                ? evaluateHSignal(n - k)    // convolution
-                : evaluateHSignal(k - n);  // unflipped shifted
-            sum += xVal * hVal;
-        }
-            return sum;
+        return computeConvolutionSamples({
+            isDiscrete,
+            isHFlipped,
+            tAxis,
+            tau,
+            dt,
+            evaluateXSignal,
+            evaluateHSignal,
         });
     }, [dt, evaluateHSignal, evaluateXSignal, isDiscrete, isHFlipped, tAxis, tau]);
 
@@ -573,12 +561,16 @@ export default function ConvolutionPage() {
             setXInput("rect");
             setXWidthText(isDiscrete ? "1" : "1.00");
             setXAmpText("1.00");
-            setT0(isDiscrete ? -2 : -2.5);
+            setT0(
+                isDiscrete
+                    ? convolutionConfig.defaults.discreteSlidePosition
+                    : convolutionConfig.defaults.slidePosition
+            );
         }
 
         if (xSource === "expression") {
             setXExpr("");
-            setT0(isDiscrete ? -15 : -15);
+            setT0(convolutionConfig.defaults.expressionSlidePosition);
         }
     }, [xSource, isDiscrete]);
 
@@ -589,17 +581,27 @@ export default function ConvolutionPage() {
             setHInput(defaultHSignal.preset);
             setHWidthText(isDiscrete ? "1" : "1.00");
             setHAmpText("1.00");
-            setT0(isDiscrete ? -2 : -2.5);
+            setT0(
+                isDiscrete
+                    ? convolutionConfig.defaults.discreteSlidePosition
+                    : convolutionConfig.defaults.slidePosition
+            );
         }
 
         if (hSource === "expression") {
             setHExpr("");
-            setT0(isDiscrete ? -15 : -15);
+            setT0(convolutionConfig.defaults.expressionSlidePosition);
         }
     }, [hSource, isDiscrete]);
 
-    const modalH = Math.min(0.92 * vh, 760);
-    const drawCanvasH = Math.max(260, Math.floor(modalH - 120));
+    const modalH = Math.min(
+        convolutionConfig.layout.drawModalViewportRatio * vh,
+        convolutionConfig.layout.maximumDrawModalHeight
+    );
+    const drawCanvasH = Math.max(
+        convolutionConfig.layout.minimumDrawCanvasHeight,
+        Math.floor(modalH - convolutionConfig.layout.drawModalReservedHeight)
+    );
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -614,43 +616,17 @@ export default function ConvolutionPage() {
     }, []);
 
     return (
-    <main
-        style={{
-        minHeight: "100vh",
-        height: useScrollableLayout ? "auto" : "100vh",
-        padding: isMobile ? "8px 6px 28px" : "10px 12px 40px",
-        boxSizing: "border-box",
-        overflow: useScrollableLayout ? "auto" : "hidden",
-        color: "#ffffff",
-        background: backgroundColor,
-        fontSize: isMobile ? "0.9rem" : "1rem"
+    <ResponsiveLabPageShell
+        title="Convolution"
+        isMobile={isMobile}
+        headerRef={headerRef}
+        mainStyle={{
+            height: useScrollableLayout ? "auto" : "100vh",
+            overflow: useScrollableLayout ? "auto" : "hidden",
+            background: backgroundColor,
+            fontSize: isMobile ? "0.9rem" : "1rem",
         }}
     >
-        
-    {/* Header; 3 column; 1fr at back to center title */}
-    <div ref={headerRef} style={{ display: "grid", gridTemplateColumns: isMobile ? "auto 1fr" : "1fr auto 1fr", alignItems: "center", marginBottom: gapBottom}}>
-        {/* Back Link */}
-        <div>
-            <Link
-                href="/"
-                style = {{
-                    display: "inline-block",
-                    border: borderColor,
-                    borderRadius: 10,
-                    padding: "5px 10px",
-                    fontWeight: 650,
-                    fontSize: 13,
-                }}
-            >
-                ← Back
-            </Link>
-        </div>
-        {/* Title */}
-        <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 750, margin: 0, justifySelf: "center",}}>
-            Convolution
-        </h1>
-    </div>
-    {/* End of header */}
 
     {/* Control Panel */}
     <div
@@ -664,48 +640,26 @@ export default function ConvolutionPage() {
             background: "rgba(0,0,0,0.12)",
             }}
     >
-        {/* Time Mode Buttons */}
-        <div
-            style={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 8,
-                marginBottom: gapBottom,
-            }}
-        >
-            <ButtonToggle label="Continuous-time" active={!isDiscrete} onClick={() => setTimeMode("continuous")} />
-            <ButtonToggle label="Discrete-time" active={isDiscrete} onClick={() => setTimeMode("discrete")} />
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginLeft: isMobile ? 0 : "auto",
-                    flexBasis: isMobile ? "100%" : "auto",
-                    fontWeight: 800,
-                }}
-            >
-                <span>Convolution kernel:</span>
-                <ButtonToggle
-                    label={isHFlipped ? "h flipped ✓" : "Flip h"}
-                    active={isHFlipped}
-                    onClick={() => setIsHFlipped((previous) => !previous)}
-                />
-            </div>
-        </div>
+        {/* Time mode and convolution-stage controls */}
+        <ConvolutionStageToolbar
+            timeMode={timeMode}
+            setTimeMode={setTimeMode}
+            isHFlipped={isHFlipped}
+            setIsHFlipped={setIsHFlipped}
+            isMobile={isMobile}
+            gapBottom={gapBottom}
+        />
 
         {/* X and H Panels */}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12}}>
             {/* X Panel */}
-            <div>
-                <SignalSourceSelection
+            <SignalSourceEditor
                     signalName="x"
                     varLetter={varLetter}
                     source={xSource}    
                     setSource={setXSource}
                     gapBottom={gapBottom}
-                />
+            >
                 {xSource === "preset" && (
                     <>
                         {/* x preset drop down selection */}
@@ -785,17 +739,16 @@ export default function ConvolutionPage() {
                         varLetter = {varLetter}
                     />
                 )}
-            </div>
+            </SignalSourceEditor>
             {/* End of X Panel */}
             {/* H Panel */}
-            <div>
-                <SignalSourceSelection
+            <SignalSourceEditor
                     signalName="h"
                     varLetter={varLetter}
                     source={hSource}    
                     setSource={setHSource}
                     gapBottom={gapBottom}
-                />
+            >
                 {hSource === "preset" && (
                 <>
                     {/* h preset drop down selection */}
@@ -874,7 +827,7 @@ export default function ConvolutionPage() {
                         varLetter = {varLetter}
                     />
                 )}
-            </div>
+            </SignalSourceEditor>
             {/* End of H Panel */}
         </div>
 
@@ -978,6 +931,6 @@ export default function ConvolutionPage() {
         />
     )}
 
-    </main>
+    </ResponsiveLabPageShell>
     );
 }

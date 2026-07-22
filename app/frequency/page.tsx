@@ -1,55 +1,53 @@
 "use client";
 
-import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import SignalPlot, { makeStemTraces } from "@/components/visualization/SignalPlot";
+import SignalPlot from "@/components/visualization/SignalPlot";
 import { ButtonToggle, ParameterSlider } from "@/components/controls/ControlPanelSource";
 import { theme } from "@/styles/theme";
 import { InlineMath, BlockMath } from "react-katex";
 import type { PageMode, PairMode, TransformPairConfig, SineComponent } from "@/features/frequency/types";
-import { formatPhase, getPhaseSymbol, rect, sinc, wrapPhase } from "@/features/frequency/frequencyMath";
+import { formatPhase, getPhaseSymbol, rect, sinc } from "@/features/frequency/frequencyMath";
 import { makeImpulseTraces } from "@/features/frequency/frequencyPlot";
 import FourierPairLabel from "@/features/frequency/FourierPairLabel";
+import { buildSineSpectrum, buildSpectrumPlotTraces } from "@/features/frequency/spectrumPlotBuilder";
+import TransformPairCatalogue from "@/features/frequency/components/TransformPairCatalogue";
+import { pairParameterLabel, showParameterSlider } from "@/features/frequency/transformPairCatalogue";
+import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
+import EducationalExplanationCard from "@/components/education/EducationalExplanationCard";
+import { createInitialComponentTexts, frequencyConfig } from "@/features/frequency/config";
 
-const MAX_SINES = 8;
-
-const componentColors = [
-    "#22c55e",
-    "#3b82f6",
-    "#f97316",
-    "#a855f7",
-    "#ef4444",
-    "#14b8a6",
-    "#eab308",
-    "#ec4899",
-];
+const { maximumSines: MAX_SINES } = frequencyConfig.limits;
+const componentColors = frequencyConfig.componentColors;
 
 export default function FourierPage() {
-    const [viewportWidth, setViewportWidth] = useState(1280);
-    const isMobile = viewportWidth < 600;
-    const isTablet = viewportWidth >= 600 && viewportWidth < 1024;
-    const useSingleColumnPlots = viewportWidth < 1024;
+    // Responsive layout state controls how the editors and plots are arranged.
+    const [viewportWidth, setViewportWidth] = useState<number>(frequencyConfig.defaults.viewportWidth);
+    const isMobile = viewportWidth < frequencyConfig.breakpoints.mobile;
+    const isTablet = viewportWidth >= frequencyConfig.breakpoints.mobile && viewportWidth < frequencyConfig.breakpoints.tablet;
+    const useSingleColumnPlots = viewportWidth < frequencyConfig.breakpoints.tablet;
 
-    const [pageMode, setPageMode] = useState<PageMode>("sine-builder");
-    const [pairMode, setPairMode] = useState<PairMode>("exp-right");
+    // The page has two learning activities: building a signal from sine waves
+    // and browsing common Fourier transform pairs.
+    const [pageMode, setPageMode] = useState<PageMode>(frequencyConfig.defaults.pageMode);
+    const [pairMode, setPairMode] = useState<PairMode>(frequencyConfig.defaults.pairMode);
 
-    const [pairWidth, setPairWidth] = useState(1);
-    const [pairWidthText, setPairWidthText] = useState("1.00");
+    // pairWidth is the mathematical parameter used by the selected transform
+    // pair. pairWidthText preserves what the user is currently typing.
+    const [pairWidth, setPairWidth] = useState<number>(frequencyConfig.defaults.pairWidth);
+    const [pairWidthText, setPairWidthText] = useState(frequencyConfig.defaults.pairWidth.toFixed(2));
 
-    const [components, setComponents] = useState<SineComponent[]>([
-        { id: 1, frequency: 1, amplitude: 1, phase: 0 },
-        { id: 2, frequency: 2, amplitude: 0.5, phase: 0 },
-        { id: 3, frequency: 3, amplitude: 0.25, phase: 0 },
-    ]);
+    // Each component represents A sin(2 pi f t + phase) in the signal builder.
+    const [components, setComponents] = useState<SineComponent[]>(() =>
+        frequencyConfig.defaults.components.map((component) => ({ ...component }))
+    );
 
+    // Text values are stored separately from numeric values so an input can
+    // temporarily contain an incomplete number such as "-" or "1.".
     const [componentTexts, setComponentTexts] = useState<
         Record<number, { frequency: string; amplitude: string; phase: string }>
-    >({
-        1: { frequency: "1.00", amplitude: "1.00", phase: "0.00" },
-        2: { frequency: "2.00", amplitude: "0.50", phase: "0.00" },
-        3: { frequency: "3.00", amplitude: "0.25", phase: "0.00" },
-    });
+    >(() => createInitialComponentTexts());
 
+    // Keep the responsive layout in sync with the browser width.
     useEffect(() => {
         const update = () => setViewportWidth(window.innerWidth);
 
@@ -59,10 +57,13 @@ export default function FourierPage() {
         return () => window.removeEventListener("resize", update);
     }, []);
 
+    // Shared time axis used by every sine component and their combined signal.
     const tAxis = useMemo(() => {
-        return Array.from({ length: 1600 }, (_, i) => -2 + (4 * i) / 1599);
+        const { min, max, points } = frequencyConfig.axes.signalTime;
+        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
     }, []);
 
+    // Generate one time-domain Plotly trace for each editable sine component.
     const componentTraces = useMemo(() => {
         return components.map((c, index) => ({
             x: tAxis,
@@ -81,6 +82,7 @@ export default function FourierPage() {
         }));
     }, [components, tAxis]);
 
+    // Add the component values point-by-point to form the composite signal.
     const compositeSignal = useMemo(() => {
         return tAxis.map((t) =>
             components.reduce((sum, c) => {
@@ -93,73 +95,10 @@ export default function FourierPage() {
         );
     }, [tAxis, components]);
 
-    const sineSpectrum = useMemo(() => {
-    type ComplexValue = {
-        re: number;
-        im: number;
-    };
+    // Convert the sines into their positive- and negative-frequency impulses.
+    const sineSpectrum = useMemo(() => buildSineSpectrum(components), [components]);
 
-    const spectrumMap = new Map<string, { frequency: number; value: ComplexValue }>();
-
-    function addToSpectrum(frequency: number, magnitude: number, phase: number) {
-            const key = frequency.toFixed(6);
-
-            const re = magnitude * Math.cos(phase);
-            const im = magnitude * Math.sin(phase);
-
-            const existing = spectrumMap.get(key);
-
-            if (existing) {
-                existing.value.re += re;
-                existing.value.im += im;
-            } else {
-                spectrumMap.set(key, {
-                    frequency,
-                    value: { re, im },
-                });
-            }
-        }
-
-        components.forEach((c) => {
-            const magnitude = Math.abs(c.amplitude) / 2;
-
-            // Positive frequency: phase = φ - π/2
-            addToSpectrum(
-                c.frequency,
-                magnitude,
-                c.phase - Math.PI / 2
-            );
-
-            // Negative frequency: phase = -φ + π/2
-            addToSpectrum(
-                -c.frequency,
-                magnitude,
-                -c.phase + Math.PI / 2
-            );
-        });
-
-        const sorted = Array.from(spectrumMap.values())
-            .map((item) => {
-                const { re, im } = item.value;
-
-                const magnitude = Math.sqrt(re * re + im * im);
-                const phase = magnitude < 1e-9 ? 0 : wrapPhase(Math.atan2(im, re));
-
-                return {
-                    frequency: item.frequency,
-                    magnitude,
-                    phase,
-                };
-            })
-            .sort((a, b) => a.frequency - b.frequency);
-
-        return {
-            frequencies: sorted.map((p) => p.frequency),
-            magnitudes: sorted.map((p) => p.magnitude),
-            phases: sorted.map((p) => p.phase),
-        };
-    }, [components]);
-
+    // Update the numeric model after an editor value has been validated.
     function updateComponent(
         id: number,
         key: keyof Omit<SineComponent, "id">,
@@ -170,6 +109,7 @@ export default function FourierPage() {
         );
     }
 
+    // Update only the text displayed inside a component's numeric input.
     function updateComponentText(
         id: number,
         key: keyof Omit<SineComponent, "id">,
@@ -184,6 +124,7 @@ export default function FourierPage() {
         }));
     }
 
+    // Add a new sine with a unique ID and sensible initial values.
     function addComponent() {
         if (components.length >= MAX_SINES) return;
 
@@ -192,7 +133,10 @@ export default function FourierPage() {
                 ? 1
                 : Math.max(...components.map((c) => c.id)) + 1;
 
-        const defaultFrequency = Math.min(components.length + 1, 15);
+        const defaultFrequency = Math.min(
+            components.length + 1,
+            frequencyConfig.limits.frequency.max
+        );
 
         setComponents((prev) => [
             ...prev,
@@ -214,6 +158,7 @@ export default function FourierPage() {
         }));
     }
 
+    // Remove both the mathematical component and its matching input text.
     function removeComponent(id: number) {
         setComponents((prev) => prev.filter((c) => c.id !== id));
 
@@ -224,6 +169,7 @@ export default function FourierPage() {
         });
     }
 
+    // Trace for the sum of all component signals.
     const compositeTraces = [
         {
             x: tAxis,
@@ -235,20 +181,11 @@ export default function FourierPage() {
         },
     ];
 
-    const magnitudeTraces = makeStemTraces(
-        sineSpectrum.frequencies,
-        sineSpectrum.magnitudes,
-        "Magnitude spectrum",
-        "rgba(37,99,235,0.95)"
-    );
+    // Build separate Plotly traces for magnitude and phase spectra.
+    const { magnitudeTraces, phaseTraces } = buildSpectrumPlotTraces(sineSpectrum);
 
-    const phaseTraces = makeStemTraces(
-        sineSpectrum.frequencies,
-        sineSpectrum.phases,
-        "Phase spectrum",
-        "rgba(249,115,22,0.95)"
-    );
-
+    // The following JSX equations are regenerated from the current component
+    // values so the mathematics always agrees with the plots.
     const compositeSignalText = (
         <div
             style={{
@@ -334,19 +271,32 @@ export default function FourierPage() {
         </div>
     );
 
-    const plotHeight = isMobile ? 315 : isTablet ? 350 : 270;
+    // Plot dimensions and frequency range adapt to the viewport and signal.
+    const plotHeight = isMobile
+        ? frequencyConfig.plotHeights.mobile
+        : isTablet
+          ? frequencyConfig.plotHeights.tablet
+          : frequencyConfig.plotHeights.desktop;
 
     const maxFreq = Math.max(...components.map((c) => c.frequency), 1);
-    const freqRange: [number, number] = [-maxFreq - 1, maxFreq + 1];
+    const freqRange: [number, number] = [
+        -maxFreq - frequencyConfig.axes.spectrumPadding,
+        maxFreq + frequencyConfig.axes.spectrumPadding,
+    ];
 
+    // Dense, shared axes for plotting the transform-pair catalogue examples.
     const pairTimeAxis = useMemo(() => {
-        return Array.from({ length: 6000 }, (_, i) => -6 + (12 * i) / 5999);
+        const { min, max, points } = frequencyConfig.axes.pairTime;
+        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
     }, []);
 
     const pairFreqAxis = useMemo(() => {
-        return Array.from({ length: 6000 }, (_, i) => -10 + (20 * i) / 5999);
+        const { min, max, points } = frequencyConfig.axes.pairFrequency;
+        return Array.from({ length: points }, (_, i) => min + ((max - min) * i) / (points - 1));
     }, []);
 
+    // Catalogue data for each transform pair. Every entry defines its displayed
+    // equation, labels, and sampled time- and frequency-domain functions.
     const transformPairs: Record<PairMode, TransformPairConfig> = {
         // e^(-at) u(t)
         "exp-right": {
@@ -571,8 +521,11 @@ export default function FourierPage() {
         },
     };
 
+    // Look up the catalogue entry chosen by the user.
     const selectedPair = transformPairs[pairMode];
 
+    // Some pairs are ordinary curves, while delta functions and impulse trains
+    // provide specialised stem traces that take priority when available.
     const pairTimeTraces =
     selectedPair.timeImpulseTraces ??
     [
@@ -599,93 +552,10 @@ export default function FourierPage() {
         },
     ];
 
-    const pairParameterLabel: Record<PairMode, string> = {
-        "rect-to-sinc": "Width T",
-        "sinc-to-rect": "Width T",
-        triangle: "Width T",
-
-        "exp-right": "Decay Constant a",
-        "exp-left": "Decay Constant a",
-        "double-exp": "Decay Constant a",
-
-        cosine: "Frequency f₀",
-        sine: "Frequency f₀",
-        "complex-exp": "Frequency f₀",
-
-        "impulse-train": "Period T₀",
-
-        delta: "Parameter",
-        constant: "Parameter",
-        step: "Parameter",
-    };
-
-    const showParameterSlider: Record<PairMode, boolean> = {
-        "rect-to-sinc": true,
-        "sinc-to-rect": true,
-        triangle: true,
-
-        "exp-right": true,
-        "exp-left": true,
-        "double-exp": true,
-
-        cosine: true,
-        sine: true,
-        "complex-exp": true,
-
-        "impulse-train": true,
-
-        delta: false,
-        constant: false,
-        step: false,
-    };
-
+    // Render the mode controls followed by the editors, equations, and plots
+    // that belong to the currently selected learning activity.
     return (
-        <main
-            style={{
-                minHeight: "100vh",
-                padding: isMobile ? "8px 6px 28px" : "10px 12px 40px",
-                boxSizing: "border-box",
-                overflow: "auto",
-                color: "#ffffff",
-                background: theme.colors.background,
-            }}
-        >
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "auto 1fr" : "1fr auto 1fr",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: theme.spacing.controlGap,
-                }}
-            >
-                <div>
-                    <Link
-                        href="/"
-                        style={{
-                            display: "inline-block",
-                            border: theme.borders.standard,
-                            borderRadius: 10,
-                            padding: "5px 10px",
-                            fontWeight: 650,
-                            fontSize: 13,
-                        }}
-                    >
-                        ← Back
-                    </Link>
-                </div>
-
-                <h1
-                    style={{
-                        fontSize: isMobile ? 17 : isTablet ? 20 : 22,
-                        fontWeight: 750,
-                        margin: 0,
-                        justifySelf: isMobile ? "start" : "center",
-                    }}
-                >
-                    Frequency Domain
-                </h1>
-            </div>
+        <ResponsiveLabPageShell title="Frequency Domain" isMobile={isMobile} mobileTitleSize={17}>
 
             <div
                 style={{
@@ -804,9 +674,9 @@ export default function FourierPage() {
                                         setText={(s) =>
                                             updateComponentText(c.id, "frequency", s)
                                         }
-                                        minRange={0.1}
-                                        maxRange={15}
-                                        stepRange={0.1}
+                                        minRange={frequencyConfig.limits.frequency.min}
+                                        maxRange={frequencyConfig.limits.frequency.max}
+                                        stepRange={frequencyConfig.limits.frequency.step}
                                     />
 
                                     <ParameterSlider
@@ -822,9 +692,9 @@ export default function FourierPage() {
                                         setText={(s) =>
                                             updateComponentText(c.id, "amplitude", s)
                                         }
-                                        minRange={0}
-                                        maxRange={5}
-                                        stepRange={0.01}
+                                        minRange={frequencyConfig.limits.amplitude.min}
+                                        maxRange={frequencyConfig.limits.amplitude.max}
+                                        stepRange={frequencyConfig.limits.amplitude.step}
                                     />
 
                                     <ParameterSlider
@@ -840,9 +710,9 @@ export default function FourierPage() {
                                         setText={(s) =>
                                             updateComponentText(c.id, "phase", s)
                                         }
-                                        minRange={-Math.PI}
-                                        maxRange={Math.PI}
-                                        stepRange={0.01}
+                                        minRange={frequencyConfig.limits.phase.min}
+                                        maxRange={frequencyConfig.limits.phase.max}
+                                        stepRange={frequencyConfig.limits.phase.step}
                                     />
                                 </div>
                             ))}
@@ -881,26 +751,11 @@ export default function FourierPage() {
                                     opacity: 0.75,
                                 }}
                             >
-                                Maximum 8 sine components reached.
+                                Maximum {MAX_SINES} sine components reached.
                             </span>
                         )}
 
-                        <div
-                            style={{
-                                marginTop: 16,
-                                padding: 12,
-                                borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.15)",
-                                background: "rgba(255,255,255,0.04)",
-                                fontFamily: "monospace",
-                                lineHeight: 1.6,
-                                overflowX: "auto",
-                            }}
-                        >
-                            <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                                Composite Signal
-                            </div>
-
+                        <EducationalExplanationCard title="Composite Signal" marginTop={16}>
                             <div style={{ marginBottom: 6 }}>{compositeSignalText}</div>
 
                             <div
@@ -941,7 +796,7 @@ export default function FourierPage() {
                                     {fourierTransformPhaseText}
                                 </span>
                             </div>
-                        </div>
+                        </EducationalExplanationCard>
                     </>
                 )}
 
@@ -968,14 +823,11 @@ export default function FourierPage() {
                                     gap: 8,          // spacing between buttons
                                 }}
                             >
-                                {(Object.keys(transformPairs) as PairMode[]).map((mode) => (
-                                    <ButtonToggle
-                                        key={mode}
-                                        label={transformPairs[mode].label}
-                                        active={pairMode === mode}
-                                        onClick={() => setPairMode(mode)}
-                                    />
-                                ))}
+                                <TransformPairCatalogue
+                                    transformPairs={transformPairs}
+                                    pairMode={pairMode}
+                                    setPairMode={setPairMode}
+                                />
                             </div>
                             
                         </div>
@@ -987,9 +839,9 @@ export default function FourierPage() {
                                 setValue={setPairWidth}
                                 text={pairWidthText}
                                 setText={setPairWidthText}
-                                minRange={0.2}
-                                maxRange={10}
-                                stepRange={0.01}
+                                minRange={frequencyConfig.limits.pairParameter.min}
+                                maxRange={frequencyConfig.limits.pairParameter.max}
+                                stepRange={frequencyConfig.limits.pairParameter.step}
                             />
                         ) : (
                             <div
@@ -1004,55 +856,9 @@ export default function FourierPage() {
                             </div>
                         )}
 
-                        <div
-                            style={{
-                                marginTop: 12,
-                                padding: 12,
-                                borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.15)",
-                                background: "rgba(255,255,255,0.04)",
-                                fontFamily: "monospace",
-                                lineHeight: 1.6,
-                                overflowX: "auto",
-                            }}
-                        >
-                            <div style={{ fontWeight: 800, marginBottom: 6 }}>
-                                Current Transform Pair
-                            </div>
-                            
-
+                        <EducationalExplanationCard title="Current Transform Pair">
                             <BlockMath math={selectedPair.formula} />
-
-                            {/* <div
-                                style={{
-                                    marginTop: 12,
-                                    padding: "10px 12px",
-                                    borderRadius: 10,
-                                    background: "rgba(255,255,255,0.05)",
-                                    border: "1px solid rgba(255,255,255,0.15)",
-                                    lineHeight: 1.6,
-                                }}
-                                >
-                                <div
-                                    style={{
-                                    fontWeight: 700,
-                                    textDecoration: "underline",
-                                    marginBottom: 8,
-                                    }}
-                                >
-                                    Observation
-                                </div>
-
-                                <div style={{ marginBottom: 8 }}>
-                                    <InlineMath math="\operatorname{sinc}(t)=\frac{\sin(\pi t)}{\pi t}" />
-                                </div>
-
-                                <div style={{ fontSize: 14, opacity: 0.85 }}>
-                                    Increasing the width in one domain makes the corresponding Fourier transform
-                                    narrower in the other domain.
-                                </div>
-                            </div> */}
-                        </div>
+                        </EducationalExplanationCard>
                     </>
                 )}
             </div>
@@ -1150,7 +956,7 @@ export default function FourierPage() {
                         traces={pairTimeTraces}
                         xLabel="t"
                         yLabel="Amplitude"
-                        xRange={[-6, 6]}
+                        xRange={[frequencyConfig.axes.pairTime.min, frequencyConfig.axes.pairTime.max]}
                         yRange={selectedPair.timeYRange}
                         compact={isMobile}
                         compactM={isTablet}
@@ -1162,13 +968,13 @@ export default function FourierPage() {
                         traces={pairFreqTraces}
                         xLabel="f"
                         yLabel="Magnitude"
-                        xRange={[-10, 10]}
+                        xRange={[frequencyConfig.axes.pairFrequency.min, frequencyConfig.axes.pairFrequency.max]}
                         yRange={selectedPair.freqYRange}
                         compact={isMobile}
                         compactM={isTablet}
                     />
                 </div>
             )}
-        </main>
+        </ResponsiveLabPageShell>
     );
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { Data } from "plotly.js";
 import { useEffect, useMemo, useState } from "react";
 import { InlineMath } from "react-katex";
@@ -8,26 +7,35 @@ import { InlineMath } from "react-katex";
 import SignalPlot, { makeStemTraces } from "@/components/visualization/SignalPlot";
 import { ParameterSlider } from "@/components/controls/ControlPanelSource";
 import { theme } from "@/styles/theme";
-import { formatPhase, getSignedAliasFrequency, sinc } from "@/features/sampling/samplingMath";
+import { formatPhase, getSignedAliasFrequency } from "@/features/sampling/samplingMath";
 import { makeImpulseTraces } from "@/features/sampling/samplingPlot";
+import { reconstructSignal } from "@/features/sampling/samplingEngine";
+import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
+import EducationalExplanationCard from "@/components/education/EducationalExplanationCard";
+import { samplingConfig } from "@/features/sampling/config";
 
 export default function SamplingPage() {
-    const [viewportWidth, setViewportWidth] = useState(1280);
-    const isMobile = viewportWidth < 600;
-    const isTablet = viewportWidth >= 600 && viewportWidth < 1024;
-    const useSingleColumnPlots = viewportWidth < 1024;
+    // Responsive layout state determines the number of control and plot columns.
+    const [viewportWidth, setViewportWidth] = useState<number>(samplingConfig.defaults.viewportWidth);
+    const isMobile = viewportWidth < samplingConfig.breakpoints.mobile;
+    const isTablet = viewportWidth >= samplingConfig.breakpoints.mobile && viewportWidth < samplingConfig.breakpoints.tablet;
+    const useSingleColumnPlots = viewportWidth < samplingConfig.breakpoints.tablet;
 
-    const [amplitude, setAmplitude] = useState(1);
-    const [signalFrequency, setSignalFrequency] = useState(8);
-    const [samplingFrequency, setSamplingFrequency] = useState(20);
-    const [phase, setPhase] = useState(0);
+    // Mathematical parameters of x(t) and the sampler.
+    const [amplitude, setAmplitude] = useState<number>(samplingConfig.defaults.amplitude);
+    const [signalFrequency, setSignalFrequency] = useState<number>(samplingConfig.defaults.signalFrequency);
+    const [samplingFrequency, setSamplingFrequency] = useState<number>(samplingConfig.defaults.samplingFrequency);
+    const [phase, setPhase] = useState<number>(samplingConfig.defaults.phase);
 
-    const [amplitudeText, setAmplitudeText] = useState("1.00");
-    const [signalFrequencyText, setSignalFrequencyText] = useState("8.00");
+    // Text state is separate from numeric state so users can type partial values
+    // without immediately producing an invalid signal calculation.
+    const [amplitudeText, setAmplitudeText] = useState(samplingConfig.defaults.amplitude.toFixed(2));
+    const [signalFrequencyText, setSignalFrequencyText] = useState(samplingConfig.defaults.signalFrequency.toFixed(2));
     const [samplingFrequencyText, setSamplingFrequencyText] =
-        useState("20.00");
-    const [phaseText, setPhaseText] = useState("0.00");
+        useState(samplingConfig.defaults.samplingFrequency.toFixed(2));
+    const [phaseText, setPhaseText] = useState(samplingConfig.defaults.phase.toFixed(2));
 
+    // Keep the responsive layout in sync with the current browser width.
     useEffect(() => {
         const updateViewport = () => {
             setViewportWidth(window.innerWidth);
@@ -39,11 +47,13 @@ export default function SamplingPage() {
         return () => window.removeEventListener("resize", updateViewport);
     }, []);
 
-    const timeMin = -0.5;
-    const timeMax = 0.5;
+    // All time-domain plots use this shared one-second observation window.
+    const timeMin = samplingConfig.timeDomain.min;
+    const timeMax = samplingConfig.timeDomain.max;
 
+    // Create a dense axis so the original and reconstructed curves look smooth.
     const continuousTimeAxis = useMemo(() => {
-        const pointCount = 5000;
+        const pointCount = samplingConfig.timeDomain.pointCount;
 
         return Array.from({ length: pointCount }, (_, index) => {
             return (
@@ -53,6 +63,7 @@ export default function SamplingPage() {
         });
     }, [timeMin, timeMax]);
 
+    // Evaluate the original continuous sinusoid at every point on the dense axis.
     const originalSignalSamples = useMemo(() => {
         return continuousTimeAxis.map((time) => {
             return (
@@ -69,44 +80,42 @@ export default function SamplingPage() {
         phase,
     ]);
 
+    // Derived sampling quantities used by the status panel and equations.
     const samplingPeriod = 1 / samplingFrequency;
     const nyquistRate = 2 * signalFrequency;
 
-    const nyquistTolerance = 0.001;
+    const nyquistTolerance = samplingConfig.nyquist.tolerance;
 
+    // Classify the current sampling rate as safe, critical, or aliasing.
     const nyquistStatus = useMemo(() => {
         const difference = samplingFrequency - nyquistRate;
 
         if (Math.abs(difference) <= nyquistTolerance) {
             return {
                 label: "At Nyquist limit",
-                color: "#eab308",
-                background: "rgba(234,179,8,0.10)",
-                border: "1px solid rgba(234,179,8,0.55)",
+                ...samplingConfig.statusStyles.nyquist,
             };
         }
 
         if (difference > 0) {
             return {
                 label: "No aliasing",
-                color: "#22c55e",
-                background: "rgba(34,197,94,0.10)",
-                border: "1px solid rgba(34,197,94,0.55)",
+                ...samplingConfig.statusStyles.safe,
             };
         }
 
         return {
             label: "Aliasing",
-            color: "#ef4444",
-            background: "rgba(239,68,68,0.10)",
-            border: "1px solid rgba(239,68,68,0.55)",
+            ...samplingConfig.statusStyles.aliasing,
         };
-    }, [samplingFrequency, nyquistRate]);
+    }, [samplingFrequency, nyquistRate, nyquistTolerance]);
 
     const isAliasing = samplingFrequency < nyquistRate - nyquistTolerance;
     const isAtNyquist =
         Math.abs(samplingFrequency - nyquistRate) <= nyquistTolerance;
 
+    // When undersampling occurs, fold the source frequency into the principal
+    // Nyquist interval to find the frequency seen after reconstruction.
     const signedAliasFrequency = useMemo(() => {
         if (!isAliasing) {
             return signalFrequency;
@@ -124,6 +133,7 @@ export default function SamplingPage() {
 
     const aliasFrequency = Math.abs(signedAliasFrequency);
 
+    // Generate the actual discrete sample times n/fs and their signal values.
     const sampledSignal = useMemo(() => {
         const firstSampleIndex = Math.ceil(timeMin * samplingFrequency);
         const lastSampleIndex = Math.floor(timeMax * samplingFrequency);
@@ -164,58 +174,17 @@ export default function SamplingPage() {
         timeMax,
     ]);
 
+    // Reconstruct the sampled signal over the dense axis using sinc interpolation.
     const reconstructedSamples = useMemo(() => {
-        /*
-         * Ideal band-limited reconstruction:
-         *
-         *   x_hat(t) = sum_n x[n] sinc(f_s t - n)
-         *
-         * Samples beyond the visible window are included so truncating the
-         * infinite sinc sum does not create large edge ripples in the plot.
-         * Unlike drawing an analytic sine at the alias frequency, this also
-         * handles phase and the Nyquist boundary exactly as the samples do.
-         */
-        const interpolationPadding = 128;
-        const firstIndex =
-            Math.floor(timeMin * samplingFrequency) -
-            interpolationPadding;
-        const lastIndex =
-            Math.ceil(timeMax * samplingFrequency) +
-            interpolationPadding;
-
-        const interpolationSamples = Array.from(
-            { length: lastIndex - firstIndex + 1 },
-            (_, offset) => {
-                const index = firstIndex + offset;
-                const sampleTime = index / samplingFrequency;
-
-                return {
-                    index,
-                    value:
-                        amplitude *
-                        Math.sin(
-                            2 *
-                                Math.PI *
-                                signalFrequency *
-                                sampleTime +
-                                phase
-                        ),
-                };
-            }
-        );
-
-        return continuousTimeAxis.map((time) =>
-            interpolationSamples.reduce(
-                (sum, sample) =>
-                    sum +
-                    sample.value *
-                        sinc(
-                            samplingFrequency * time -
-                                sample.index
-                        ),
-                0
-            )
-        );
+        return reconstructSignal({
+            continuousTimeAxis,
+            amplitude,
+            phase,
+            signalFrequency,
+            samplingFrequency,
+            timeMin,
+            timeMax,
+        });
     }, [
         continuousTimeAxis,
         amplitude,
@@ -226,6 +195,7 @@ export default function SamplingPage() {
         timeMax,
     ]);
 
+    // Plotly trace for the original continuous-time signal.
     const originalSignalTraces = useMemo(() => {
         return [
             {
@@ -242,6 +212,7 @@ export default function SamplingPage() {
         ];
     }, [continuousTimeAxis, originalSignalSamples]);
 
+    // Overlay discrete sample stems on a faint copy of the original signal.
     const sampledSignalTraces = useMemo(() => {
         const originalReference = {
             x: continuousTimeAxis,
@@ -270,6 +241,7 @@ export default function SamplingPage() {
         sampledSignal,
     ]);
 
+    // Compare the sinc reconstruction with the original curve and sample points.
     const reconstructionTraces = useMemo(() => {
         const traces: Data[] = [
             {
@@ -344,8 +316,10 @@ export default function SamplingPage() {
         sampledSignal,
     ]);
 
+    // Sampling repeats the original spectrum around every integer multiple k*fs.
+    // This block builds those impulses plus short centre markers labelled by k.
     const spectrumReplicaTraces = useMemo(() => {
-        const replicaCount = 3;
+        const replicaCount = samplingConfig.spectrum.replicaCount;
         const traces: Data[] = [];
         const replicaColor = "rgba(37,99,235,0.78)";
         const baseSpectrumColor = "rgba(124,58,237,1)";
@@ -448,13 +422,17 @@ export default function SamplingPage() {
         amplitude,
     ]);
 
+    // Expand the frequency axis far enough to show three replicas on each side.
     const frequencyPlotLimit = useMemo(() => {
         return Math.max(
-            20,
-            3 * samplingFrequency + signalFrequency + 2
+            samplingConfig.spectrum.minimumFrequencyLimit,
+            samplingConfig.spectrum.replicaCount * samplingFrequency +
+                signalFrequency +
+                samplingConfig.spectrum.frequencyPadding
         );
     }, [samplingFrequency, signalFrequency]);
 
+    // Red dotted guides mark the two Nyquist boundaries at +/- fs/2.
     const frequencyShapes = useMemo(() => {
         return [
             {
@@ -484,59 +462,16 @@ export default function SamplingPage() {
         ];
     }, [samplingFrequency, amplitude]);
 
-    const plotHeight = isMobile ? 330 : isTablet ? 355 : 365;
+    // Taller plots improve readability on narrow touch screens.
+    const plotHeight = isMobile
+        ? samplingConfig.plotHeights.mobile
+        : isTablet
+          ? samplingConfig.plotHeights.tablet
+          : samplingConfig.plotHeights.desktop;
 
+    // Render the controls, learning feedback, and four linked visualisations.
     return (
-        <main
-            style={{
-                minHeight: "100vh",
-                padding: isMobile ? "8px 6px 28px" : "10px 12px 40px",
-                boxSizing: "border-box",
-                overflow: "auto",
-                color: theme.colors.text,
-                background: theme.colors.background,
-            }}
-        >
-            {/* Header */}
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile
-                        ? "auto 1fr"
-                        : "1fr auto 1fr",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: theme.spacing.controlGap,
-                }}
-            >
-                <div>
-                    <Link
-                        href="/"
-                        style={{
-                            display: "inline-block",
-                            border: theme.borders.standard,
-                            borderRadius: 10,
-                            padding: "5px 10px",
-                            fontWeight: 650,
-                            fontSize: 13,
-                        }}
-                    >
-                        ← Back
-                    </Link>
-                </div>
-
-                <h1
-                    style={{
-                        margin: 0,
-                        justifySelf: isMobile ? "start" : "center",
-                        fontSize: isMobile ? 16 : isTablet ? 20 : 22,
-                        fontWeight: 750,
-                        lineHeight: 1.2,
-                    }}
-                >
-                    Sampling & Aliasing Laboratory
-                </h1>
-            </div>
+        <ResponsiveLabPageShell title="Sampling & Aliasing Laboratory" isMobile={isMobile} mobileTitleSize={16}>
 
             {/* Controls */}
             <section
@@ -565,9 +500,9 @@ export default function SamplingPage() {
                         setValue={setAmplitude}
                         text={amplitudeText}
                         setText={setAmplitudeText}
-                        minRange={0.1}
-                        maxRange={5}
-                        stepRange={0.01}
+                        minRange={samplingConfig.controls.amplitude.min}
+                        maxRange={samplingConfig.controls.amplitude.max}
+                        stepRange={samplingConfig.controls.amplitude.step}
                     />
 
                     <ParameterSlider
@@ -576,9 +511,9 @@ export default function SamplingPage() {
                         setValue={setSignalFrequency}
                         text={signalFrequencyText}
                         setText={setSignalFrequencyText}
-                        minRange={0.5}
-                        maxRange={20}
-                        stepRange={0.1}
+                        minRange={samplingConfig.controls.signalFrequency.min}
+                        maxRange={samplingConfig.controls.signalFrequency.max}
+                        stepRange={samplingConfig.controls.signalFrequency.step}
                     />
 
                     <ParameterSlider
@@ -587,9 +522,9 @@ export default function SamplingPage() {
                         setValue={setSamplingFrequency}
                         text={samplingFrequencyText}
                         setText={setSamplingFrequencyText}
-                        minRange={1}
-                        maxRange={50}
-                        stepRange={0.1}
+                        minRange={samplingConfig.controls.samplingFrequency.min}
+                        maxRange={samplingConfig.controls.samplingFrequency.max}
+                        stepRange={samplingConfig.controls.samplingFrequency.step}
                     />
 
                     <ParameterSlider
@@ -598,9 +533,9 @@ export default function SamplingPage() {
                         setValue={setPhase}
                         text={phaseText}
                         setText={setPhaseText}
-                        minRange={-Math.PI}
-                        maxRange={Math.PI}
-                        stepRange={0.01}
+                        minRange={samplingConfig.controls.phase.min}
+                        maxRange={samplingConfig.controls.phase.max}
+                        stepRange={samplingConfig.controls.phase.step}
                     />
                 </div>
 
@@ -682,27 +617,7 @@ export default function SamplingPage() {
                 </div>
 
                 {/* Formula explanation */}
-                <div
-                    style={{
-                        marginTop: 12,
-                        padding: 12,
-                        borderRadius: 10,
-                        border:
-                            "1px solid rgba(255,255,255,0.15)",
-                        background:
-                            "rgba(255,255,255,0.035)",
-                        overflowX: "auto",
-                    }}
-                >
-                    <div
-                        style={{
-                            fontWeight: 800,
-                            marginBottom: 6,
-                        }}
-                    >
-                        Sampling relationships
-                    </div>
-
+                <EducationalExplanationCard title="Sampling relationships">
                     <div
                         style={{
                             display: "flex",
@@ -727,7 +642,7 @@ export default function SamplingPage() {
                             math={String.raw`f_{\mathrm{alias}}=\left|f_0-kf_s\right|`}
                         />
                     </div>
-                </div>
+                </EducationalExplanationCard>
             </section>
 
             {/* Time-domain row */}
@@ -881,24 +796,7 @@ export default function SamplingPage() {
                 />
             </div>
 
-            <section
-                style={{
-                    marginTop: theme.spacing.controlGap,
-                    padding: 12,
-                    borderRadius: 12,
-                    border: theme.borders.standard,
-                    background: theme.colors.panelBackground,
-                }}
-            >
-                <div
-                    style={{
-                        fontWeight: 800,
-                        marginBottom: 6,
-                    }}
-                >
-                    Observation
-                </div>
-
+            <EducationalExplanationCard title="Observation" marginTop={theme.spacing.controlGap}>
                 {isAliasing ? (
                     <div>
                         Since{" "}
@@ -933,7 +831,7 @@ export default function SamplingPage() {
                         without aliasing.
                     </div>
                 )}
-            </section>
-        </main>
+            </EducationalExplanationCard>
+        </ResponsiveLabPageShell>
     );
 }

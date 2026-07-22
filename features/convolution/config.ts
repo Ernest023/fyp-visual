@@ -10,3 +10,49 @@ export const backgroundColor = "rgb(0, 0, 0)";
 // Initial signals shown when the convolution laboratory opens.
 export const defaultXSignal = createDefaultSignalState("rect");
 export const defaultHSignal = createDefaultSignalState("step");
+
+// Behaviour, control limits, numerical resolution, and responsive thresholds
+// used throughout the convolution laboratory.
+export const convolutionConfig = {
+    defaults: {
+        timeMode: "continuous",
+        isHFlipped: false,
+        slidePosition: -2.5,
+        discreteSlidePosition: -2,
+        expressionSlidePosition: -15,
+        viewportWidth: 1280,
+    },
+    controls: {
+        continuousWidth: { min: 0.2, max: 3, step: 0.01 },
+        discreteWidth: { min: 1, max: 20, step: 1 },
+        amplitude: { min: -10, max: 10, step: 0.01 },
+        drawingAmplitude: { min: -10, max: 10, step: 0.01 },
+    },
+    breakpoints: {
+        mobile: 600,
+        tablet: 1100,
+        compactDesktop: 1400,
+    },
+    sampling: {
+        densityMultiplier: 1,
+        continuousInputPoints: 1400,
+        continuousOutputPoints: 700,
+        fixedContinuousDomain: 30,
+        continuousBaseDomain: 2,
+        continuousDomainPadding: 0.5,
+        fixedDiscreteIndex: 60,
+        minimumDiscreteIndex: 40,
+        discreteDomainPadding: 6,
+    },
+    layout: {
+        bottomSafeHeight: 46,
+        minimumPlotAreaHeight: 240,
+        initialViewportHeight: 800,
+        mobilePlotHeight: 330,
+        tabletPlotHeight: 350,
+        maximumDrawModalHeight: 760,
+        drawModalViewportRatio: 0.92,
+        drawModalReservedHeight: 120,
+        minimumDrawCanvasHeight: 260,
+    },
+} as const;

@@ -8,7 +8,6 @@ const labs = [
     title: "Convolution Canvas",
     description: "Flip, slide, and overlap two signals to build an intuitive picture of convolution.",
     difficulty: "Foundational",
-    duration: "8–12 min",
     accent: "#22c55e",
     bars: [32, 32, 64, 64, 64, 44, 24, 50, 50, 28],
     outcomes: ["Connect overlap area to the output", "Compare continuous and discrete time"],
@@ -19,7 +18,6 @@ const labs = [
     title: "Frequency Domain Explorer",
     description: "Compose signals and see their magnitude and phase spectra respond immediately.",
     difficulty: "Intermediate",
-    duration: "10–15 min",
     accent: "#8b5cf6",
     bars: [16, 24, 36, 58, 82, 58, 36, 24, 16, 10],
     outcomes: ["Link waveform shape to spectral content", "Explore harmonics, magnitude, and phase"],
@@ -30,7 +28,6 @@ const labs = [
     title: "Sampling & Aliasing Laboratory",
     description: "Change the sampling rate and watch reconstruction succeed—or fold into an alias.",
     difficulty: "Intermediate",
-    duration: "8–12 min",
     accent: "#3b82f6",
     bars: [66, 20, 58, 28, 48, 38, 38, 48, 28, 58, 20, 66],
     outcomes: ["Recognise the Nyquist threshold", "Relate spectral replicas to aliasing"],
@@ -40,6 +37,7 @@ const labs = [
 export default function HomePage() {
   return (
     <main className="home-shell">
+      <h1 className="landing-title">Signal Studio</h1>
       <section className="lab-grid" aria-label="Signals and Systems laboratories">
         {labs.map((lab) => (
           <Link
@@ -54,9 +52,9 @@ export default function HomePage() {
             <div className="lab-illustration" aria-hidden="true">
               {lab.bars.map((height, index) => <span key={index} style={{ height }} />)}
             </div>
-            <h1>{lab.title}</h1>
+            <h2>{lab.title}</h2>
             <p className="lab-description">{lab.description}</p>
-            <div className="lab-meta"><span>{lab.difficulty}</span><span>{lab.duration}</span></div>
+            <div className="lab-meta"><span>{lab.difficulty}</span></div>
             <ul className="outcomes">{lab.outcomes.map((outcome) => <li key={outcome}>{outcome}</li>)}</ul>
             <span className="lab-cta">Open laboratory <span aria-hidden="true">→</span></span>
           </Link>
