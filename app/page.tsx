@@ -26,7 +26,7 @@ const labs = [
     href: "/sampling",
     index: "LAB 03",
     title: "Sampling & Aliasing Laboratory",
-    description: "Change the sampling rate and watch reconstruction succeed—or fold into an alias.",
+    description: "Change the sampling rate and watch reconstruction succeed or fold into an alias.",
     difficulty: "Intermediate",
     accent: "#3b82f6",
     bars: [66, 20, 58, 28, 48, 38, 38, 48, 28, 58, 20, 66],
