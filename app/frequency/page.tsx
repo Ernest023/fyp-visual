@@ -213,7 +213,7 @@ export default function FourierPage() {
 
             {components.map((c, i) => (
                 <span key={i}>
-                    {i > 0 && <span style={{ color: "white" }}> + </span>}
+                    {i > 0 && <span style={{ color: theme.colors.text }}> + </span>}
 
                     <span style={{ color: componentColors[i] }}>
                         <InlineMath
@@ -243,7 +243,7 @@ export default function FourierPage() {
             {components.map((c, i) => {
                 return (
                     <span key={i}>
-                        {i > 0 && <span style={{ color: "white" }}> + </span>}
+                        {i > 0 && <span style={{ color: theme.colors.text }}> + </span>}
 
                         <span style={{ color: componentColors[i] }}>
                             <InlineMath math={`\\frac{${c.amplitude.toFixed(2)}}{2j}\\left[e^{j${getPhaseSymbol(c.phase)}}\\cdot\\delta\\left(f-${c.frequency.toFixed(2)}\\right)-e^{-j${getPhaseSymbol(c.phase)}}\\cdot\\delta\\left(f+${c.frequency.toFixed(2)}\\right)\\right]`}/>
@@ -272,7 +272,7 @@ export default function FourierPage() {
 
                 return (
                     <span key={i}>
-                        {i > 0 && <span style={{ color: "white" }}> + </span>}
+                        {i > 0 && <span style={{ color: theme.colors.text }}> + </span>}
 
                         <span style={{ color: componentColors[i] }}>
                             <InlineMath
@@ -614,7 +614,7 @@ export default function FourierPage() {
                     padding: isMobile ? 8 : 10,
                     boxSizing: "border-box",
                     marginBottom: theme.spacing.controlGap,
-                    background: "rgba(0,0,0,0.12)",
+                    background: "var(--plot-card)",
                 }}
             >
                 <div
@@ -660,7 +660,7 @@ export default function FourierPage() {
                                 <div
                                     key={c.id}
                                     style={{
-                                        border: "1px solid rgba(255,255,255,0.25)",
+                                        border: theme.borders.standard,
                                         borderRadius: 12,
                                         padding: 10,
                                     }}
@@ -689,7 +689,7 @@ export default function FourierPage() {
                                                     borderRadius: "50%",
                                                     backgroundColor: componentColors[index % componentColors.length],
                                                     display: "inline-block",
-                                                    border: "1px solid rgba(255,255,255,0.35)",
+                                                    border: theme.borders.standard,
                                                 }}
                                             />
                                             
@@ -702,7 +702,7 @@ export default function FourierPage() {
                                                     border: theme.borders.standard,
                                                     borderRadius: 8,
                                                     background: "transparent",
-                                                    color: "white",
+                                                    color: theme.colors.text,
                                                     cursor: "pointer",
                                                 }}
                                             >
@@ -779,9 +779,9 @@ export default function FourierPage() {
                                 border: theme.borders.standard,
                                 background:
                                     components.length >= MAX_SINES
-                                        ? "rgba(255,255,255,0.08)"
+                                        ? "var(--control-muted)"
                                         : "transparent",
-                                color: "white",
+                                color: theme.colors.text,
                                 fontWeight: 800,
                                 cursor:
                                     components.length >= MAX_SINES
@@ -811,7 +811,7 @@ export default function FourierPage() {
                             <div
                                 style={{
                                     paddingTop: 5,
-                                    borderTop: "1px solid rgba(255,255,255,0.15)",
+                                    borderTop: theme.borders.subtle,
                                 }}
                             >
                                 <div style={{ fontWeight: 800, marginBottom: 6 }}>
@@ -834,7 +834,7 @@ export default function FourierPage() {
                             <div
                                 style={{
                                     paddingTop: 5,
-                                    borderTop: "1px solid rgba(255,255,255,0.15)",
+                                    borderTop: theme.borders.subtle,
                                 }}
                             >
                                 <div style={{ fontWeight: 800, marginBottom: 6 }}>
@@ -865,8 +865,8 @@ export default function FourierPage() {
                                     marginTop: 12,
                                     padding: 12,
                                     borderRadius: 12,
-                                    border: "1px solid rgba(255,255,255,0.15)",
-                                    background: "rgba(255,255,255,0.03)",
+                                    border: theme.borders.subtle,
+                                    background: theme.colors.panelElevated,
 
                                     display: "flex",
                                     flexWrap: "wrap",

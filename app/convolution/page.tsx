@@ -649,7 +649,7 @@ export default function ConvolutionPage() {
             padding: 10,
             boxSizing: "border-box",
             marginBottom: gapBottom,
-            background: "rgba(0,0,0,0.12)",
+            background: "var(--plot-card)",
             }}
     >
         {/* Time mode and convolution-stage controls */}

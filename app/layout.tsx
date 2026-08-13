@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -17,8 +18,38 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var saved =
+                    localStorage.getItem("signal-studio-theme-v2");
+
+                  var theme =
+                    saved === "light" || saved === "dark"
+                      ? saved
+                      : "dark";
+
+                  localStorage.removeItem("signal-studio-theme");
+
+                  document.documentElement.dataset.theme = theme;
+                  document.documentElement.style.colorScheme = theme;
+                } catch (e) {
+                  document.documentElement.dataset.theme = "dark";
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
+
+      <body>
+        <ThemeToggle />
+        {children}
+      </body>
     </html>
   );
 }

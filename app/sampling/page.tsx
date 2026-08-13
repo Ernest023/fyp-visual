@@ -307,7 +307,7 @@ export default function SamplingPage() {
                     color: theme.colors.outputSignal,
                     size: 8,
                     line: {
-                        color: "rgba(255,255,255,0.9)",
+                        color: theme.colors.plotBackground,
                         width: 1,
                     },
                 },

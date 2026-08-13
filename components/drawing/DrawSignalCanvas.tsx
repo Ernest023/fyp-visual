@@ -83,16 +83,22 @@ export default function DrawSignalCanvas({
 
     const w = canvas.clientWidth; // current displayed width of the canvas
     const h = height;
+    const styles = getComputedStyle(document.documentElement);
+    const canvasBackground = styles.getPropertyValue("--canvas-bg").trim();
+    const canvasGrid = styles.getPropertyValue("--canvas-grid").trim();
+    const canvasZero = styles.getPropertyValue("--canvas-zero").trim();
+    const canvasLabel = styles.getPropertyValue("--canvas-label").trim();
+    const signalColour = styles.getPropertyValue("--signal-output").trim() || "#3b82f6";
     // set the actual drawing surface size
     canvas.width = w;
     canvas.height = h;
 
     // background
-    ctx.fillStyle = "#0b0b0b";
+    ctx.fillStyle = canvasBackground;
     ctx.fillRect(0, 0, w, h);
 
     // gridline of the background
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = canvasGrid;
     ctx.lineWidth = 1;
     // number of gridline if discrete mode → based on tau length, but limited between 8 and 16 if continuous mode → always 8
     const vLines = discrete ? Math.min(16, Math.max(8, tau.length)) : 8;
@@ -116,7 +122,7 @@ export default function DrawSignalCanvas({
     let yBase = valueToY(yMin, h, yMin, yMax);
     if (yMin < 0 && yMax > 0) {
       yBase = valueToY(0, h, yMin, yMax);
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.strokeStyle = canvasZero;
       ctx.beginPath();
       ctx.moveTo(0, yBase);
       ctx.lineTo(w, yBase);
@@ -124,7 +130,7 @@ export default function DrawSignalCanvas({
     }
 
     // label
-    ctx.fillStyle = "rgba(255,255,255,0.78)";
+    ctx.fillStyle = canvasLabel;
     ctx.font = "12px system-ui";
     ctx.fillText(
       discrete ? `Draw h[n]   (range ${yMin}..${yMax})` : `Draw h(t)   (range ${yMin}..${yMax})`,
@@ -134,7 +140,7 @@ export default function DrawSignalCanvas({
 
     if (!discrete) {
       // continuous line
-      ctx.strokeStyle = "#3b82f6";
+      ctx.strokeStyle = signalColour;
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i = 0; i < tau.length; i++) {
@@ -148,7 +154,7 @@ export default function DrawSignalCanvas({
     }
 
     // discrete stems + markers
-    ctx.strokeStyle = "rgba(59,130,246,0.95)";
+    ctx.strokeStyle = signalColour;
     ctx.lineWidth = 2;
 
     for (let i = 0; i < tau.length; i++) {
@@ -162,7 +168,7 @@ export default function DrawSignalCanvas({
       ctx.stroke();
 
       // marker; small circle at the end of the verticle line for discrete
-      ctx.fillStyle = "rgba(59,130,246,0.95)";
+      ctx.fillStyle = signalColour;
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
@@ -175,8 +181,13 @@ export default function DrawSignalCanvas({
   // redraw when window resize because canva depend on screen size value
   useEffect(() => {
     const onResize = () => redraw();
+    const onThemeChange = () => redraw();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("signal-studio-theme-change", onThemeChange);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("signal-studio-theme-change", onThemeChange);
+    };
   }, [redraw]);
 
   function applyPointer(px: number, py: number) {
@@ -228,10 +239,10 @@ export default function DrawSignalCanvas({
     <div
       style={{
         width: "100%",
-        border: "1px solid #333",
+        border: "1px solid var(--app-border)",
         borderRadius: 12,
         overflow: "hidden",
-        background: "#0b0b0b",
+        background: "var(--canvas-bg)",
         padding: 8,
         boxSizing: "border-box",
       }}
@@ -251,7 +262,7 @@ export default function DrawSignalCanvas({
             height,
             fontFamily: "monospace",
             fontSize: 12,
-            color: "rgba(255,255,255,0.75)",
+            color: "var(--canvas-label)",
             userSelect: "none",
           }}
         >
@@ -307,7 +318,7 @@ export default function DrawSignalCanvas({
           justifyContent: "space-between",
           fontFamily: "monospace",
           fontSize: 12,
-          color: "rgba(255,255,255,0.75)",
+          color: "var(--canvas-label)",
           userSelect: "none",
         }}
       >

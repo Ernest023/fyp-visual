@@ -32,9 +32,9 @@ const clearBtnStyle: React.CSSProperties = {
     width: 22,
     height: 22,
     borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.25)",
-    background: "rgba(255,255,255,0.08)",
-    color: "white",
+    border: "1px solid var(--app-border)",
+    background: "var(--control-muted)",
+    color: "var(--app-text)",
     cursor: "pointer",
     fontWeight: 900,
     lineHeight: "20px",
@@ -74,7 +74,7 @@ export default function CustomExpressionInput({
             borderRadius: 8,
             border: theme.borders.standard,
             background: theme.colors.background,
-            color: "white",
+            color: theme.colors.text,
             padding: "0 8px",
             outline: "none",
             boxSizing: "border-box",
@@ -91,9 +91,9 @@ export default function CustomExpressionInput({
       {trimmedValue.length > 0 && (
         <div style={{ marginTop: 6, fontSize: 12 }}>
           {parsedOk ? (
-            <span style={{ color: "rgba(34,197,94,0.95)" }}>✅ Parsed OK</span>
+            <span style={{ color: theme.colors.inputSignal }}>✅ Parsed OK</span>
           ) : (
-            <span style={{ color: "rgba(239,68,68,0.95)" }}>
+            <span style={{ color: theme.colors.danger }}>
               ❌ {error || "Parse error"}
             </span>
           )}
@@ -124,9 +124,9 @@ export default function CustomExpressionInput({
                   height: 26,
                   padding: "0 10px",
                   borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.30)",
+                  border: theme.borders.standard,
                   background: "transparent",
-                  color: "white",
+                  color: theme.colors.text,
                   cursor: "pointer",
                   fontWeight: 800,
                   fontFamily: "monospace",

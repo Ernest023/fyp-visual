@@ -67,12 +67,12 @@ export function ButtonToggle({ label, active, onClick }: { label: React.ReactNod
             padding: "0 12px",
             borderRadius: 10,
             border: active ? theme.borders.active : theme.borders.standard,
-            background: active ? "rgba(255,255,255,0.25)" : "transparent",
-            color: "white",
+            background: active ? "var(--control-active)" : "transparent",
+            color: theme.colors.text,
             fontWeight: 800,
             cursor: "pointer",
             whiteSpace: "nowrap",
-            boxShadow: active ? "0 0 0 2px rgba(255,255,255,0.10)" : "none",
+            boxShadow: active ? "0 0 0 2px var(--control-active-ring)" : "none",
             }}>
       {label}
     </button>
@@ -113,7 +113,7 @@ export function TextBoxSliders({
                         fontSize: 12,
                         fontFamily: "monospace",
                         padding: "0 6px",
-                        color: "white",
+                        color: theme.colors.text,
                         background: theme.colors.background,
                     }}
                     value={widthText}
@@ -287,7 +287,7 @@ export default function SignalSourcePreset({
                     <select 
                     value={selectedPreset} 
                     onChange={(e) => setSelectedPreset(e.target.value as PresetInput)} 
-                    style={{ width: "100%", height: 34, borderRadius: 10, background: "black", color: "white", border: theme.borders.standard, marginBottom: gapBottom}} >
+                    style={{ width: "100%", height: 34, borderRadius: 10, background: theme.colors.background, color: theme.colors.text, border: theme.borders.standard, marginBottom: gapBottom}} >
                     {presets.map((p) => (
                         <option key={p.id} value={p.id}>
                             {p.id}
@@ -383,7 +383,7 @@ export function ParameterSlider({
             fontSize: 12,
             fontFamily: "monospace",
             padding: "0 6px",
-            color: "white",
+            color: theme.colors.text,
             background: theme.colors.background,
           }}
         />

@@ -84,6 +84,20 @@ export default function SignalPlot({
   const gap = 8;
   const headerRef = useRef<HTMLDivElement>(null);
   const [titleH, setTitleH] = useState(subtitle ? 44 : 26);
+  const [, setThemeRevision] = useState(0);
+
+  // Plotly needs resolved colour values rather than CSS variable references.
+  const resolveColour = (colour: string) => {
+    if (typeof window === "undefined" || !colour.startsWith("var(")) return colour;
+    const variableName = colour.slice(4, -1).trim();
+    return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+  };
+
+  useLayoutEffect(() => {
+    const handleThemeChange = () => setThemeRevision((revision) => revision + 1);
+    window.addEventListener("signal-studio-theme-change", handleThemeChange);
+    return () => window.removeEventListener("signal-studio-theme-change", handleThemeChange);
+  }, []);
 
   // Wrapped subtitles can occupy more than one line. Measure the heading so
   // the Plotly canvas always begins below it instead of being overlapped.
@@ -103,19 +117,22 @@ export default function SignalPlot({
 
   const plotHeight = Math.max(160, height - pad * 2 - titleH - gap);
 
-  const axisColor = theme.colors.plotAxis;
-  const gridColor = theme.colors.gridLine;
-  const zeroColor = theme.colors.zeroLine;
+  const axisColor = resolveColour(theme.colors.plotAxis);
+  const gridColor = resolveColour(theme.colors.gridLine);
+  const zeroColor = resolveColour(theme.colors.zeroLine);
+  const plotBackground = resolveColour(theme.colors.plotBackground);
+  const plotLegend = resolveColour(theme.colors.plotLegend);
+  const plotLegendBorder = resolveColour(theme.colors.plotLegendBorder);
 
   return (
     <div
       style={{
         height,
-        border: "1px solid rgba(255,255,255,0.35)",
+        border: theme.borders.standard,
         borderRadius: 14,
         padding: pad,
         boxSizing: "border-box",
-        background: "rgba(0,0,0,0.12)",
+        background: "var(--plot-card)",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -156,7 +173,7 @@ export default function SignalPlot({
             b: compact ? 42 : compactM ? 48 + 30 : 48 + 10,
           },
           paper_bgcolor: "rgba(0,0,0,0)",
-          plot_bgcolor: "white",
+          plot_bgcolor: plotBackground,
 
           xaxis: {
             range: xRange,
@@ -217,8 +234,8 @@ export default function SignalPlot({
             y: 0.99,
             xanchor: "right",
             yanchor: "top",
-            bgcolor: "rgba(255,255,255,0.80)",
-            bordercolor: "rgba(0,0,0,0.15)",
+            bgcolor: plotLegend,
+            bordercolor: plotLegendBorder,
             borderwidth: 1,
           },
 

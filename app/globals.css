@@ -10,6 +10,70 @@
   --app-text: #f8fafc;
   --app-muted: #9fb0c8;
   --app-accent: #38bdf8;
+  --convolution-background: #000000;
+  --signal-output: #3b82f6;
+  --app-border-active: #7dd3fc;
+  --control-active: rgba(255, 255, 255, 0.25);
+  --control-active-ring: rgba(255, 255, 255, 0.1);
+  --control-muted: rgba(255, 255, 255, 0.08);
+  --overlay: rgba(0, 0, 0, 0.72);
+  --plot-background: #ffffff;
+  --plot-grid: rgba(0, 0, 0, 0.18);
+  --plot-zero: rgba(0, 0, 0, 0.38);
+  --plot-axis: rgba(231, 231, 231, 0.85);
+  --plot-annotation: rgba(15, 23, 42, 0.82);
+  --plot-annotation-muted: rgba(15, 23, 42, 0.62);
+  --plot-legend: rgba(255, 255, 255, 0.88);
+  --plot-legend-border: rgba(0, 0, 0, 0.15);
+  --plot-card: rgba(0, 0, 0, 0.12);
+  --canvas-bg: #0b0b0b;
+  --canvas-grid: rgba(255, 255, 255, 0.1);
+  --canvas-zero: rgba(255, 255, 255, 0.35);
+  --canvas-label: rgba(255, 255, 255, 0.78);
+  --landing-card-start: #101a2b;
+  --landing-card-end: #0b1423;
+  --landing-illustration: rgba(2, 6, 15, 0.52);
+  --landing-description: #aebdd1;
+  --landing-outcome: #cbd5e1;
+  --shadow: rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="light"] {
+  --app-bg: #f4f7fb;
+  --app-surface: #ffffff;
+  --app-panel: #ffffff;
+  --app-panel-raised: #eef3f9;
+  --app-border: #b8c5d6;
+  --app-border-subtle: #d5deea;
+  --app-text: #142033;
+  --app-muted: #53657d;
+  --app-accent: #0369a1;
+  --convolution-background: #ffffff;
+  --signal-output: #2563eb;
+  --app-border-active: #0284c7;
+  --control-active: rgba(2, 132, 199, 0.14);
+  --control-active-ring: rgba(2, 132, 199, 0.14);
+  --control-muted: rgba(20, 32, 51, 0.06);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --plot-background: #ffffff;
+  --plot-grid: rgba(15, 23, 42, 0.14);
+  --plot-zero: rgba(15, 23, 42, 0.4);
+  --plot-axis: rgba(15, 23, 42, 0.82);
+  --plot-annotation: rgba(15, 23, 42, 0.88);
+  --plot-annotation-muted: rgba(15, 23, 42, 0.62);
+  --plot-legend: rgba(255, 255, 255, 0.94);
+  --plot-legend-border: rgba(15, 23, 42, 0.2);
+  --plot-card: rgba(255, 255, 255, 0.68);
+  --canvas-bg: #ffffff;
+  --canvas-grid: rgba(15, 23, 42, 0.12);
+  --canvas-zero: rgba(15, 23, 42, 0.38);
+  --canvas-label: rgba(15, 23, 42, 0.78);
+  --landing-card-start: #ffffff;
+  --landing-card-end: #eef4fb;
+  --landing-illustration: rgba(226, 234, 244, 0.72);
+  --landing-description: #52647c;
+  --landing-outcome: #334155;
+  --shadow: rgba(30, 41, 59, 0.15);
 }
 
 * {
@@ -19,6 +83,11 @@
 html {
   background: var(--app-bg);
   color-scheme: dark;
+}
+
+html,
+body {
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 body {
@@ -59,6 +128,33 @@ select:focus-visible {
 input[type="range"] {
   accent-color: var(--app-accent);
   cursor: pointer;
+}
+
+.theme-toggle {
+  position: fixed;
+  z-index: 1000;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  min-width: 60px;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+  color: var(--app-text);
+  box-shadow: 0 8px 24px var(--shadow);
+  cursor: pointer;
+  font-weight: 750;
+  backdrop-filter: blur(12px);
+  font-size: 10px;
+}
+
+.theme-toggle:hover {
+  border-color: var(--app-accent);
 }
 
 /* Keep educational text and equations visible without nested scrollbars. */
@@ -121,15 +217,15 @@ input[type="range"] {
   padding: 30px;
   border: 1px solid var(--app-border);
   border-radius: 24px;
-  background: linear-gradient(155deg, #101a2b, #0b1423);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(155deg, var(--landing-card-start), var(--landing-card-end));
+  box-shadow: 0 18px 44px var(--shadow);
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .lab-card:hover {
   transform: translateY(-4px);
   border-color: color-mix(in srgb, var(--card-accent) 58%, var(--app-border));
-  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 22px 54px var(--shadow);
 }
 
 .lab-card-topline {
@@ -157,7 +253,7 @@ input[type="range"] {
   padding: 18px 16px;
   border: 1px solid var(--app-border-subtle);
   border-radius: 17px;
-  background: rgba(2, 6, 15, 0.52);
+  background: var(--landing-illustration);
 }
 
 .lab-illustration span {
@@ -180,7 +276,7 @@ input[type="range"] {
 .lab-description {
   min-height: 78px;
   margin: 18px 0 24px;
-  color: #aebdd1;
+  color: var(--landing-description);
   font-size: 16px;
 }
 
@@ -205,7 +301,7 @@ input[type="range"] {
   gap: 12px;
   margin: 0 0 28px;
   padding: 0;
-  color: #cbd5e1;
+  color: var(--landing-outcome);
   font-size: 15px;
   list-style: none;
 }
@@ -246,6 +342,17 @@ input[type="range"] {
 }
 
 @media (max-width: 600px) {
+  .theme-toggle {
+    top: 8px;
+    right: 8px;
+    min-width: 44px;
+    padding: 0 12px;
+  }
+
+  .theme-toggle-label {
+    display: none;
+  }
+
   .home-shell {
     width: calc(100% - 24px);
     padding: 12px 0;

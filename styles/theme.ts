@@ -1,11 +1,11 @@
 export const theme = {
   colors: {
-    background: "#070b14",
-    surface: "#0c1322",
-    panelBackground: "#101a2b",
-    panelElevated: "#152238",
-    text: "#f8fafc",
-    textMuted: "#9fb0c8",
+    background: "var(--app-bg)",
+    surface: "var(--app-surface)",
+    panelBackground: "var(--app-panel)",
+    panelElevated: "var(--app-panel-raised)",
+    text: "var(--app-text)",
+    textMuted: "var(--app-muted)",
     inputSignal: "#22c55e",
     inputSignalMuted: "rgba(34,197,94,0.42)",
     inputSignalSurface: "rgba(34,197,94,0.10)",
@@ -22,12 +22,15 @@ export const theme = {
     spectrumReplica: "#60a5fa",
     spectrumReplicaMuted: "rgba(96,165,250,0.78)",
     sampleStem: "rgba(59,130,246,0.72)",
-    gridLine: "rgba(0,0,0,0.18)",
-    zeroLine: "rgba(0,0,0,0.38)",
-    plotAxis: "rgba(231,231,231,0.85)",
-    plotAnnotation: "rgba(15,23,42,0.82)",
-    plotAnnotationMuted: "rgba(15,23,42,0.62)",
-    accent: "#38bdf8",
+    gridLine: "var(--plot-grid)",
+    zeroLine: "var(--plot-zero)",
+    plotAxis: "var(--plot-axis)",
+    plotAnnotation: "var(--plot-annotation)",
+    plotAnnotationMuted: "var(--plot-annotation-muted)",
+    plotBackground: "var(--plot-background)",
+    plotLegend: "var(--plot-legend)",
+    plotLegendBorder: "var(--plot-legend-border)",
+    accent: "var(--app-accent)",
   },
 
   // Colours for multiple independent signal components. The first entries
@@ -44,9 +47,9 @@ export const theme = {
   ],
 
   borders: {
-    standard: "1px solid #263449",
-    subtle: "1px solid #1d2a3d",
-    active: "1px solid #7dd3fc",
+    standard: "1px solid var(--app-border)",
+    subtle: "1px solid var(--app-border-subtle)",
+    active: "1px solid var(--app-border-active)",
   },
 
   spacing: {

@@ -1,6 +1,7 @@
 "use client";
 
 import DrawSignalCanvas from "@/components/drawing/DrawSignalCanvas";
+import { theme } from "@/styles/theme";
 
 type DrawSignalPanelProps = {
     open: boolean;
@@ -43,7 +44,7 @@ export default function DrawSignalPanel({
             style={{
                 position: "fixed",
                 inset: 0,
-                background: "rgba(0,0,0,0.72)",
+                background: "var(--overlay)",
                 zIndex: 9999,
                 padding: 16,
                 display: "grid",
@@ -56,8 +57,9 @@ export default function DrawSignalPanel({
                 width: "min(1200px, 96vw)",
                 height: `${modalHeight}px`,
                 borderRadius: 14,
-                border: "1px solid rgba(255,255,255,0.35)",
-                background: "#0b0b0b",
+                border: theme.borders.standard,
+                background: theme.colors.panelBackground,
+                color: theme.colors.text,
                 boxSizing: "border-box",
                 padding: 12,
                 display: "flex",
@@ -75,9 +77,9 @@ export default function DrawSignalPanel({
                             height: 32,
                             padding: "0 12px",
                             borderRadius: 10,
-                            border: "1px solid rgba(255,255,255,0.35)",
+                            border: theme.borders.standard,
                             background: "transparent",
-                            color: "white",
+                            color: theme.colors.text,
                             fontWeight: 700,
                             cursor: "pointer",
                         }}
@@ -91,9 +93,9 @@ export default function DrawSignalPanel({
                             height: 32,
                             padding: "0 12px",
                             borderRadius: 10,
-                            border: "1px solid rgba(255,255,255,0.35)",
-                            background: "rgba(255,255,255,0.08)",
-                            color: "white",
+                            border: theme.borders.standard,
+                            background: "var(--control-muted)",
+                            color: theme.colors.text,
                             fontWeight: 800,
                             cursor: "pointer",
                         }}
