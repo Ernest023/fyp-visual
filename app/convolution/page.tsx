@@ -16,6 +16,7 @@ import { getPresetValue, getDrawnValue } from "@/library/signalEvaluator";
 import type { SignalSource } from "@/library/types";
 import { backgroundColor, borderColor, convolutionConfig, defaultHSignal, defaultXSignal, gapBottom } from "@/features/convolution/config";
 import { computeConvolutionSamples, createCachedSignalEvaluator } from "@/features/convolution/convolutionEngine";
+import { buildDiscontinuityAwarePlotSamples } from "@/features/convolution/discontinuityPlot";
 import ConvolutionStageToolbar, { type TimeMode } from "@/features/convolution/components/ConvolutionStageToolbar";
 import ResponsiveLabPageShell from "@/components/layout/ResponsiveLabPageShell";
 import SignalSourceEditor from "@/features/convolution/components/SignalSourceEditor";
@@ -365,13 +366,54 @@ export default function ConvolutionPage() {
         ? (isHFlipped ? "n-k" : "k-n")
         : (isHFlipped ? "t-τ" : "τ-t");
 
-    // Rectangular and unit-step presets contain true jump discontinuities.
-    // Plotly's step-line interpolation draws those jumps vertically instead of
-    // joining adjacent numerical samples with a short diagonal segment.
-    const xUsesStepInterpolation =
-        xSource === "preset" && (xInput === "rect" || xInput === "step");
-    const hUsesStepInterpolation =
-        hSource === "preset" && (hInput === "rect" || hInput === "step");
+    // Build plot-only samples for both presets and custom expressions. The
+    // convolution engine still uses xSamples, hDisplaySamples, and
+    // productSamples, while repeated x positions make true jumps vertical.
+    const evaluateHDisplaySignal = useCallback(
+        (inputX: number) =>
+            isHFlipped
+                ? evaluateHForConvolution(t0 - inputX)
+                : evaluateHForConvolution(inputX - t0),
+        [evaluateHForConvolution, isHFlipped, t0]
+    );
+
+    const evaluateProductSignal = useCallback(
+        (inputX: number) =>
+            evaluateXSignal(inputX) * evaluateHDisplaySignal(inputX),
+        [evaluateHDisplaySignal, evaluateXSignal]
+    );
+
+    const xPlotSamples = useMemo(
+        () =>
+            isDiscrete
+                ? { x: tau, y: xSamples }
+                : buildDiscontinuityAwarePlotSamples(tau, xSamples, evaluateXSignal),
+        [evaluateXSignal, isDiscrete, tau, xSamples]
+    );
+
+    const hPlotSamples = useMemo(
+        () =>
+            isDiscrete
+                ? { x: tau, y: hDisplaySamples }
+                : buildDiscontinuityAwarePlotSamples(
+                    tau,
+                    hDisplaySamples,
+                    evaluateHDisplaySignal
+                ),
+        [evaluateHDisplaySignal, hDisplaySamples, isDiscrete, tau]
+    );
+
+    const productPlotSamples = useMemo(
+        () =>
+            isDiscrete
+                ? { x: tau, y: productSamples }
+                : buildDiscontinuityAwarePlotSamples(
+                    tau,
+                    productSamples,
+                    evaluateProductSignal
+                ),
+        [evaluateProductSignal, isDiscrete, productSamples, tau]
+    );
 
     // plot data
     const inputTraces = useMemo(() => {
@@ -396,42 +438,39 @@ export default function ConvolutionPage() {
 
     return [
         {
-            x: tau,
-            y: xSamples,
+            x: xPlotSamples.x,
+            y: xPlotSamples.y,
             type: "scatter",
             mode: "lines",
             name: xDisplayLabel,
             line: {
                 color: theme.colors.inputSignal,
                 width: 3,
-                shape: xUsesStepInterpolation ? "hv" : "linear",
+                shape: "linear",
             },
         },
         {
-            x: tau,
-            y: hDisplaySamples,
+            x: hPlotSamples.x,
+            y: hPlotSamples.y,
             type: "scatter",
             mode: "lines",
             name: hDisplayLabel,
             line: {
                 color: theme.colors.kernelSignal,
                 width: 3,
-                shape: hUsesStepInterpolation ? "hv" : "linear",
+                shape: "linear",
             },
         },
         {
-            x: tau,
-            y: productSamples,
+            x: productPlotSamples.x,
+            y: productPlotSamples.y,
             type: "scatter",
             mode: "lines",
             name: xDisplayLabel + "·" + hDisplayLabel,
             line: {
                 color: theme.colors.dangerMuted,
                 width: 2,
-                shape:
-                    xUsesStepInterpolation || hUsesStepInterpolation
-                        ? "hv"
-                        : "linear",
+                shape: "linear",
             },
             fill : "tozeroy",
             fillcolor: theme.colors.dangerMuted,
@@ -441,13 +480,14 @@ export default function ConvolutionPage() {
     }, [
         hDisplayLabel,
         hDisplaySamples,
-        hUsesStepInterpolation,
+        hPlotSamples,
         isDiscrete,
+        productPlotSamples,
         productSamples,
         tau,
         xDisplayLabel,
+        xPlotSamples,
         xSamples,
-        xUsesStepInterpolation,
     ]);
 
     // ===== output plot y-range =====
