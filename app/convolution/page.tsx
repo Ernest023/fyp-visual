@@ -104,8 +104,8 @@ export default function ConvolutionPage() {
         if (xSource !== "expression") return null;
         if (xExpr.trim() === "") return null;
         if (!xExprCheck.ok) return null;
-        return buildExpressionEvaluator(xExpr);
-    }, [xExpr, xSource, xExprCheck]);
+        return buildExpressionEvaluator(xExpr, isDiscrete);
+    }, [isDiscrete, xExpr, xSource, xExprCheck]);
 
     
     const hExprCheck = useMemo(() => {
@@ -119,8 +119,8 @@ export default function ConvolutionPage() {
         if (hSource !== "expression") return null;
         if (hExpr.trim() === "") return null;
         if (!hExprCheck.ok) return null;
-        return buildExpressionEvaluator(hExpr);
-    }, [hExpr, hSource, hExprCheck]);
+        return buildExpressionEvaluator(hExpr, isDiscrete);
+    }, [hExpr, hSource, hExprCheck, isDiscrete]);
 
     // Handle rounding of int when switching between CT and DT 
     useEffect(() => {

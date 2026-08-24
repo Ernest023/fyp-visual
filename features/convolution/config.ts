@@ -30,12 +30,14 @@ export const convolutionConfig = {
     },
     sampling: {
         densityMultiplier: 1,
+        // Continuous-time settings
         continuousInputPoints: 1400,
         continuousOutputPoints: 700,
         fixedContinuousDomain: 30,
         continuousBaseDomain: 2,
         continuousDomainPadding: 0.5,
-        fixedDiscreteIndex: 60,
+        // Discrete-time settings
+        fixedDiscreteIndex: 40,
         minimumDiscreteIndex: 40,
         discreteDomainPadding: 6,
     },

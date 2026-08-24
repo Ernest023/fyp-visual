@@ -1,34 +1,44 @@
 import { Parser } from "expr-eval";
+import { ramp, rect, sgn, tri, u } from "./signal";
 //npm install expr-eval
 
-//rect, tri, u, ramp, sgn are not built-ins from expr-eval, must define them
+// rect, tri, u, ramp, and sgn are not built into expr-eval. These wrappers
+// deliberately reuse the preset functions so both input methods always
+// produce the same base waveform.
 export function rectExpr(t: number): number {
-  return Math.abs(t) <= 0.5 ? 1 : 0;
+  return rect(t);
 }
 
 export function triExpr(t: number): number {
-  const at = Math.abs(t);
-  return at >= 1 ? 0 : 1 - at;
+  return tri(t);
 }
 
 export function stepExpr(t: number): number {
-  return t >= 0 ? 1 : 0;
+  return u(t);
 }
 
 export function rampExpr(t: number): number {
-  return t >= 0 ? t : 0;
+  return ramp(t);
 }
 
 export function sgnExpr(t: number): number {
-  if (t > 0) return 1;
-  if (t < 0) return -1;
-  return 0;
+  return sgn(t);
 }
 
 // input: number; output: number
 export type ExpressionEvaluator = (x: number) => number;
 
-export function buildExpressionEvaluator(expr: string): ExpressionEvaluator {
+// Discrete-time notation is shown to learners with square brackets, such as
+// u[n] and rect[n/3]. expr-eval expects function calls to use parentheses, so
+// convert only at the parser boundary while keeping the visible notation.
+export function normalizeExpressionSyntax(
+  expr: string,
+  isDiscrete: boolean
+): string {
+  return isDiscrete ? expr.replaceAll("[", "(").replaceAll("]", ")") : expr;
+}
+
+function createExpressionParser() {
     //parser object, read math strings and understand as math expression
     const parser = new Parser();
 
@@ -38,8 +48,19 @@ export function buildExpressionEvaluator(expr: string): ExpressionEvaluator {
     parser.functions.u = stepExpr;
     parser.functions.ramp = rampExpr;
     parser.functions.sgn = sgnExpr;
+
+    return parser;
+}
+
+export function buildExpressionEvaluator(
+  expr: string,
+  isDiscrete = false
+): ExpressionEvaluator {
+    const parser = createExpressionParser();
+    const normalizedExpression = normalizeExpressionSyntax(expr, isDiscrete);
+
     //turn text into a usable math formula
-    const parsed = parser.parse(expr);
+    const parsed = parser.parse(normalizedExpression);
 
     return (x: number) => {
         const result = parsed.evaluate({
@@ -84,8 +105,25 @@ export function validateExpression(
   }
 
   try {
-    const evaluator = buildExpressionEvaluator(expr);
-    evaluator(0); // test once so undefined variables/functions also get caught
+    const parser = createExpressionParser();
+    const normalizedExpression = normalizeExpressionSyntax(expr, isDiscrete);
+    const parsed = parser.parse(normalizedExpression);
+
+    // Test representative negative, zero, and positive indices/positions so
+    // undefined functions and non-numeric results are not reported as valid.
+    for (const inputX of [-1, 0, 1]) {
+      const result = parsed.evaluate({
+        t: inputX,
+        n: inputX,
+        pi: Math.PI,
+        e: Math.E,
+      });
+
+      if (typeof result !== "number" || !Number.isFinite(result)) {
+        return { ok: false, error: "Expression must produce finite numbers." };
+      }
+    }
+
     return { ok: true, error: "" };
   } catch (err) {
     return {
